@@ -173,6 +173,9 @@ const elements = {
   monthSortIcon: document.querySelector("#monthSortIcon"),
   filterSummary: document.querySelector("#filterSummary"),
   exportExcel: document.querySelector("#exportExcel"),
+  backupData: document.querySelector("#backupData"),
+  importData: document.querySelector("#importData"),
+  importDataFile: document.querySelector("#importDataFile"),
   clearAll: document.querySelector("#clearAll"),
 };
 
@@ -194,6 +197,15 @@ function loadTrades() {
 
 function saveTrades() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.trades));
+}
+
+function mergeTradesById(currentTrades, importedTrades) {
+  const map = new Map(currentTrades.map((trade) => [trade.id, trade]));
+  normalizeTrades(importedTrades).forEach((trade) => {
+    if (!trade.id) trade.id = crypto.randomUUID();
+    map.set(trade.id, trade);
+  });
+  return [...map.values()];
 }
 
 function normalizeTrades(trades) {
@@ -416,6 +428,45 @@ function exportTradesToExcel() {
 function csvCell(value) {
   const text = String(value ?? "");
   return `"${text.replaceAll('"', '""')}"`;
+}
+
+function backupTradeData() {
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    version: 1,
+    trades: sortedTrades(state.trades),
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = `trade-journal-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importTradeData(file) {
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    try {
+      const payload = JSON.parse(reader.result);
+      const importedTrades = Array.isArray(payload) ? payload : payload.trades;
+      if (!Array.isArray(importedTrades)) throw new Error("Invalid backup");
+
+      state.trades = mergeTradesById(state.trades, importedTrades);
+      saveTrades();
+      render();
+      alert("Đã nhập dữ liệu thành công.");
+    } catch {
+      alert("File dữ liệu không hợp lệ.");
+    } finally {
+      elements.importDataFile.value = "";
+    }
+  });
+  reader.readAsText(file);
 }
 
 function drawChart(trades) {
@@ -660,6 +711,12 @@ elements.monthSortToggle.addEventListener("click", () => {
   render();
 });
 elements.exportExcel.addEventListener("click", exportTradesToExcel);
+elements.backupData.addEventListener("click", backupTradeData);
+elements.importData.addEventListener("click", () => elements.importDataFile.click());
+elements.importDataFile.addEventListener("change", () => {
+  const [file] = elements.importDataFile.files;
+  if (file) importTradeData(file);
+});
 
 elements.growthChart.addEventListener("mousemove", (event) => {
   const rect = elements.growthChart.getBoundingClientRect();
