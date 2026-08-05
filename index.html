@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trade Journal Riêng Tư</title>
+    <meta
+      name="description"
+      content="Web riêng tư để thống kê lệnh trade, theo dõi winrate, lợi nhuận và biểu đồ tăng trưởng."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Nhật ký giao dịch cá nhân</p>
+          <h1>Trade Vàng Dashboard</h1>
+        </div>
+        <div class="privacy-pill" title="Dữ liệu được lưu trong trình duyệt này">
+          <span></span>
+          Riêng tư trên máy này
+        </div>
+      </header>
+
+      <section class="metrics-grid" aria-label="Thông số tổng hợp">
+        <article class="metric">
+          <span>Tổng lợi nhuận</span>
+          <strong id="totalProfit">$0</strong>
+          <small id="totalR">0R</small>
+        </article>
+        <article class="metric">
+          <span>Winrate</span>
+          <strong id="winrate">0%</strong>
+          <small id="tradeCount">0 lệnh</small>
+        </article>
+        <article class="metric">
+          <span>TB lệnh thắng</span>
+          <strong id="avgWin">$0</strong>
+          <small>trung bình lợi nhuận</small>
+        </article>
+        <article class="metric">
+          <span>TB lệnh thua</span>
+          <strong id="avgLoss">$0</strong>
+          <small>trung bình thua lỗ</small>
+        </article>
+      </section>
+
+      <form id="tradeForm" class="trade-form compact-form">
+        <div class="form-head">
+          <div>
+            <h2 id="formTitle">Nhập lệnh trade</h2>
+            <p>1R = 10$. Chỉ cần nhập Profit, app sẽ tự tính R:R và Win/Loss.</p>
+          </div>
+          <button class="ghost-button" type="button" id="resetForm">Làm mới</button>
+        </div>
+
+        <input type="hidden" id="tradeId" />
+
+        <label>
+          Ngày vào lệnh
+          <input id="tradeDate" type="date" required />
+        </label>
+
+        <label>
+          Cặp
+          <input id="pair" type="text" value="XAU" placeholder="VD: XAU, EURUSD, BTC" required />
+        </label>
+
+        <label>
+          Long/Short
+          <select id="direction" required>
+            <option value="LONG">LONG</option>
+            <option value="SHORT">SHORT</option>
+          </select>
+        </label>
+
+        <label>
+          Win/Loss
+          <select id="result" required disabled title="Tự tính theo Profit">
+            <option value="WIN">WIN</option>
+            <option value="LOSS">LOSS</option>
+          </select>
+        </label>
+
+        <label>
+          Profit
+          <input id="profit" type="number" step="0.01" placeholder="VD: -10 = -1R" required />
+        </label>
+
+        <label>
+          R:R tự tính
+          <input id="rr" type="number" step="0.01" placeholder="-1" required readonly />
+        </label>
+
+        <label class="note-field">
+          Ghi chú
+          <textarea id="note" rows="2" placeholder="VD: thuận EMA M15 H1, nằm giữa EMA H4"></textarea>
+        </label>
+
+        <button class="primary-button" type="submit" id="submitTrade">Lưu lệnh</button>
+      </form>
+
+      <section class="table-panel">
+        <div class="panel-head table-toolbar">
+          <div>
+            <h2>Danh sách lệnh</h2>
+            <p id="filterSummary">Tất cả lệnh đang được hiển thị.</p>
+          </div>
+
+          <div class="filters">
+            <label>
+              Tháng
+              <select id="monthFilter">
+                <option value="all">Tất cả</option>
+              </select>
+            </label>
+            <label>
+              Cặp
+              <select id="pairFilter">
+                <option value="all">Tất cả</option>
+              </select>
+            </label>
+            <button class="ghost-button" type="button" id="exportExcel">Xuất Excel</button>
+            <button class="ghost-button danger" type="button" id="clearAll">Xóa tất cả</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>STT</th>
+                <th>
+                  <button class="sort-header" type="button" id="monthSortToggle" title="Đảo chiều sắp xếp ngày">
+                    Tháng <span id="monthSortIcon">↓</span>
+                  </button>
+                </th>
+                <th>Cặp</th>
+                <th>Long/Short</th>
+                <th>Win/Loss</th>
+                <th>Profit</th>
+                <th>R:R</th>
+                <th>Ghi chú</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tradeRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="chart-panel" aria-label="Biểu đồ tăng trưởng">
+        <div class="panel-head">
+          <div>
+            <h2>Biểu đồ tăng trưởng</h2>
+            <p>Đường cong được cộng dồn theo profit từng lệnh.</p>
+          </div>
+          <div class="toggle-group" aria-label="Kiểu biểu đồ">
+            <button class="toggle active" type="button" data-chart="profit">USD</button>
+            <button class="toggle" type="button" data-chart="rr">R</button>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="growthChart" width="920" height="320" aria-label="Biểu đồ tăng trưởng tài khoản"></canvas>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
