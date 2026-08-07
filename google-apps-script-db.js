@@ -9,7 +9,7 @@ function doGet(e) {
     .filter((row) => row[0])
     .map((row) => ({
       id: row[0],
-      date: row[1],
+      date: formatSheetDate(row[1]),
       pair: row[2],
       direction: row[3],
       result: row[4],
@@ -89,6 +89,14 @@ function replaceAll(sheet, trades) {
   sheet.clear();
   sheet.appendRow(HEADERS);
   trades.forEach((trade) => upsertTrade(sheet, trade));
+}
+
+function formatSheetDate(value) {
+  if (Object.prototype.toString.call(value) === "[object Date]" && !Number.isNaN(value.getTime())) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  }
+
+  return String(value || "").slice(0, 10);
 }
 
 function json(data, e) {
