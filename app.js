@@ -1,4 +1,6 @@
 const STORAGE_KEY = "private-trade-journal-v1";
+const REMOTE_DB_URL =
+  "https://script.google.com/macros/s/AKfycbzDQd69vlW_T4kcOQjnysea-SvltWCVCAP6yhzfWFWLfRp7A0JJ1BN2ZPyDIWGtCrms/exec";
 const HISTORICAL_IMPORT_KEY = "private-trade-journal-btc-history-v1-imported";
 const ALL_HISTORY_IMPORT_KEY = "private-trade-journal-all-history-v2-imported";
 const ONE_R_VALUE = 10;
@@ -197,6 +199,82 @@ function loadTrades() {
 
 function saveTrades() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.trades));
+}
+
+async function initializeRemoteStore() {
+  const remoteTrades = await loadRemoteTrades();
+
+  if (remoteTrades.length) {
+    state.trades = normalizeTrades(remoteTrades);
+    saveTrades();
+    render();
+    return;
+  }
+
+  await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades) });
+}
+
+async function loadRemoteTrades() {
+  try {
+    const response = await fetch(REMOTE_DB_URL);
+    const data = await response.json();
+    return Array.isArray(data.trades) ? data.trades : [];
+  } catch {
+    return loadRemoteTradesJsonp();
+  }
+}
+
+function loadRemoteTradesJsonp() {
+  return new Promise((resolve) => {
+    const callbackName = `tradeJournalCallback_${Date.now()}`;
+    const script = document.createElement("script");
+    const cleanup = () => {
+      delete window[callbackName];
+      script.remove();
+    };
+
+    window[callbackName] = (data) => {
+      cleanup();
+      resolve(Array.isArray(data.trades) ? data.trades : []);
+    };
+
+    script.addEventListener("error", () => {
+      cleanup();
+      resolve([]);
+    });
+
+    script.src = `${REMOTE_DB_URL}?callback=${callbackName}`;
+    document.body.appendChild(script);
+  });
+}
+
+async function sendRemoteAction(action, payload) {
+  try {
+    await fetch(REMOTE_DB_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8",
+      },
+      body: JSON.stringify({ action, ...payload }),
+    });
+  } catch {
+    // LocalStorage remains the offline fallback if Google Sheets is unavailable.
+  }
+}
+
+function remoteTradePayload(trade) {
+  return {
+    id: trade.id,
+    date: trade.date,
+    pair: trade.pair,
+    direction: trade.direction,
+    result: trade.result,
+    profit: Number(trade.profit),
+    rr: Number(trade.rr),
+    note: trade.note || "",
+    createdAt: Number(trade.createdAt) || Date.now(),
+  };
 }
 
 function mergeTradesById(currentTrades, importedTrades) {
@@ -450,7 +528,7 @@ function backupTradeData() {
 
 function importTradeData(file) {
   const reader = new FileReader();
-  reader.addEventListener("load", () => {
+  reader.addEventListener("load", async () => {
     try {
       const payload = JSON.parse(reader.result);
       const importedTrades = Array.isArray(payload) ? payload : payload.trades;
@@ -458,6 +536,7 @@ function importTradeData(file) {
 
       state.trades = mergeTradesById(state.trades, importedTrades);
       saveTrades();
+      await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
       render();
       alert("Đã nhập dữ liệu thành công.");
     } catch {
@@ -674,7 +753,7 @@ function render() {
   elements.filterSummary.textContent = `Đang hiển thị ${trades.length} lệnh: ${monthText}, ${pairText}.`;
 }
 
-elements.form.addEventListener("submit", (event) => {
+elements.form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const payload = {
@@ -698,6 +777,7 @@ elements.form.addEventListener("submit", (event) => {
   }
 
   saveTrades();
+  await sendRemoteAction("upsert", { trade: remoteTradePayload(payload) });
   resetForm();
   render();
 });
@@ -753,7 +833,7 @@ document.querySelectorAll(".toggle").forEach((button) => {
   });
 });
 
-elements.tradeRows.addEventListener("click", (event) => {
+elements.tradeRows.addEventListener("click", async (event) => {
   const button = event.target.closest("button");
   if (!button) return;
 
@@ -765,6 +845,7 @@ elements.tradeRows.addEventListener("click", (event) => {
     if (!ok) return;
     state.trades = state.trades.filter((item) => item.id !== trade.id);
     saveTrades();
+    await sendRemoteAction("delete", { id: trade.id });
     render();
     return;
   }
@@ -783,11 +864,12 @@ elements.tradeRows.addEventListener("click", (event) => {
   elements.form.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
-elements.clearAll.addEventListener("click", () => {
+elements.clearAll.addEventListener("click", async () => {
   const ok = confirm("Xóa tất cả lệnh đang lưu trên trình duyệt này?");
   if (!ok) return;
   state.trades = [];
   saveTrades();
+  await sendRemoteAction("replaceAll", { trades: [] });
   resetForm();
   render();
 });
@@ -796,3 +878,4 @@ window.addEventListener("resize", () => drawChart(filteredTrades()));
 
 resetForm();
 render();
+initializeRemoteStore();
