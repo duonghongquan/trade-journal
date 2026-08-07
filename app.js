@@ -171,6 +171,7 @@ const elements = {
   tradeRows: document.querySelector("#tradeRows"),
   monthFilter: document.querySelector("#monthFilter"),
   pairFilter: document.querySelector("#pairFilter"),
+  noteFilter: document.querySelector("#noteFilter"),
   monthSortToggle: document.querySelector("#monthSortToggle"),
   monthSortIcon: document.querySelector("#monthSortIcon"),
   filterSummary: document.querySelector("#filterSummary"),
@@ -377,11 +378,17 @@ function orderedDisplayTrades(trades) {
 function filteredTrades() {
   const selectedMonth = elements.monthFilter.value;
   const selectedPair = elements.pairFilter.value;
+  const selectedNote = elements.noteFilter.value;
 
   return sortedTrades().filter((trade) => {
     const monthMatch = selectedMonth === "all" || monthKey(trade.date) === selectedMonth;
     const pairMatch = selectedPair === "all" || trade.pair === selectedPair;
-    return monthMatch && pairMatch;
+    const hasNote = Boolean((trade.note || "").trim());
+    const noteMatch =
+      selectedNote === "all" ||
+      (selectedNote === "with" && hasNote) ||
+      (selectedNote === "without" && !hasNote);
+    return monthMatch && pairMatch && noteMatch;
   });
 }
 
@@ -507,9 +514,15 @@ function exportTradesToExcel() {
   const link = document.createElement("a");
   const monthPart = elements.monthFilter.value === "all" ? "tat-ca" : elements.monthFilter.value;
   const pairPart = elements.pairFilter.value === "all" ? "tat-ca-cap" : elements.pairFilter.value.toLowerCase();
+  const notePart =
+    elements.noteFilter.value === "with"
+      ? "co-ghi-chu"
+      : elements.noteFilter.value === "without"
+        ? "khong-ghi-chu"
+        : "tat-ca-ghi-chu";
 
   link.href = url;
-  link.download = `trade-journal-${monthPart}-${pairPart}.csv`;
+  link.download = `trade-journal-${monthPart}-${pairPart}-${notePart}.csv`;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -763,7 +776,13 @@ function render() {
 
   const monthText = elements.monthFilter.value === "all" ? "tất cả tháng" : `tháng ${elements.monthFilter.value}`;
   const pairText = elements.pairFilter.value === "all" ? "tất cả cặp" : elements.pairFilter.value;
-  elements.filterSummary.textContent = `Đang hiển thị ${trades.length} lệnh: ${monthText}, ${pairText}.`;
+  const noteText =
+    elements.noteFilter.value === "with"
+      ? "có ghi chú"
+      : elements.noteFilter.value === "without"
+        ? "không ghi chú"
+        : "tất cả ghi chú";
+  elements.filterSummary.textContent = `Đang hiển thị ${trades.length} lệnh: ${monthText}, ${pairText}, ${noteText}.`;
 }
 
 elements.form.addEventListener("submit", async (event) => {
@@ -799,6 +818,7 @@ elements.resetForm.addEventListener("click", resetForm);
 elements.profit.addEventListener("input", syncDerivedFields);
 elements.monthFilter.addEventListener("change", render);
 elements.pairFilter.addEventListener("change", render);
+elements.noteFilter.addEventListener("change", render);
 elements.monthSortToggle.addEventListener("click", () => {
   state.sortOrder = state.sortOrder === "oldest" ? "newest" : "oldest";
   render();
