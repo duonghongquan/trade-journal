@@ -174,9 +174,7 @@ const elements = {
   profit: document.querySelector("#profit"),
   rr: document.querySelector("#rr"),
   oneRValue: document.querySelector("#oneRValue"),
-  oneRStartDate: document.querySelector("#oneRStartDate"),
   saveOneRRule: document.querySelector("#saveOneRRule"),
-  rrRuleSummary: document.querySelector("#rrRuleSummary"),
   note: document.querySelector("#note"),
   submitTrade: document.querySelector("#submitTrade"),
   resetForm: document.querySelector("#resetForm"),
@@ -251,10 +249,10 @@ function normalizeRrRules(rules) {
 
 async function saveOneRRule() {
   const value = Number(elements.oneRValue.value);
-  const startDate = elements.oneRStartDate.value;
+  const startDate = elements.tradeDate.value;
 
   if (!Number.isFinite(value) || value <= 0 || !startDate) {
-    alert("Nhập đủ mức 1R và ngày bắt đầu áp dụng.");
+    alert("Nhập mức 1R và chọn Ngày vào lệnh trước khi lưu.");
     return;
   }
 
@@ -900,8 +898,6 @@ function suggestRrFromCurrentFields(force) {
 function updateRrRuleInputs() {
   const rule = getActiveRrRule(elements.tradeDate.value || new Date().toISOString().slice(0, 10));
   elements.oneRValue.value = rule.value;
-  elements.oneRStartDate.value = rule.startDate;
-  elements.rrRuleSummary.textContent = `Đang áp dụng: 1R = $${rule.value} từ ${monthLabel(rule.startDate)}. R:R có thể chỉnh tay từng lệnh.`;
 }
 
 function getActiveRrRule(date) {

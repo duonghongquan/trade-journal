@@ -180,7 +180,7 @@ label {
 .rr-settings {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: 120px 180px auto 1fr;
+  grid-template-columns: 120px auto 1fr;
   gap: 10px;
   align-items: end;
   padding: 10px;
@@ -465,7 +465,7 @@ td:nth-child(7) {
   }
 
   .rr-settings {
-    grid-template-columns: 1fr 1fr auto;
+    grid-template-columns: 1fr auto;
   }
 
   .compact-form .form-head,
