@@ -292,8 +292,13 @@ function normalizeTrades(trades) {
     ...trade,
     date: normalizeDateValue(trade.date),
     result: profitToResult(trade.profit),
-    rr: profitToR(trade.profit),
+    rr: normalizeRValue(trade),
   }));
+}
+
+function normalizeRValue(trade) {
+  const rr = Number(trade.rr);
+  return Number.isFinite(rr) ? rr : profitToR(trade.profit);
 }
 
 function normalizeDateValue(value) {
@@ -759,7 +764,9 @@ function syncDerivedFields() {
   }
 
   const profit = Number(elements.profit.value);
-  elements.rr.value = profitToR(profit);
+  if (elements.rr.value === "") {
+    elements.rr.value = profitToR(profit);
+  }
   elements.result.value = profitToResult(profit);
 }
 
@@ -795,7 +802,7 @@ elements.form.addEventListener("submit", async (event) => {
     direction: elements.direction.value,
     result: profitToResult(elements.profit.value),
     profit: Number(elements.profit.value),
-    rr: profitToR(elements.profit.value),
+    rr: Number(elements.rr.value),
     note: elements.note.value.trim(),
     createdAt: Date.now(),
   };
@@ -889,9 +896,8 @@ elements.tradeRows.addEventListener("click", async (event) => {
   elements.direction.value = trade.direction;
   elements.result.value = trade.result;
   elements.profit.value = trade.profit;
-  elements.rr.value = profitToR(trade.profit);
+  elements.rr.value = trade.rr;
   elements.note.value = trade.note;
-  syncDerivedFields();
   elements.formTitle.textContent = "Sửa lệnh trade";
   elements.submitTrade.textContent = "Cập nhật lệnh";
   elements.form.scrollIntoView({ behavior: "smooth", block: "start" });
