@@ -169,7 +169,7 @@ label {
 }
 
 .compact-form {
-  grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr 1fr 1.8fr auto;
+  grid-template-columns: 240px 1.2fr 0.9fr 1fr 1fr 0.9fr 0.9fr 1.8fr auto;
   align-items: end;
 }
 
@@ -178,15 +178,17 @@ label {
 }
 
 .rr-settings {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: 120px auto 1fr;
-  gap: 10px;
+  display: flex;
+  gap: 8px;
   align-items: end;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(11, 17, 23, 0.68);
+}
+
+.rr-settings label {
+  width: 118px;
+}
+
+.rr-settings .ghost-button {
+  white-space: nowrap;
 }
 
 .compact-form .note-field {
@@ -464,10 +466,6 @@ td:nth-child(7) {
     grid-template-columns: repeat(3, 1fr);
   }
 
-  .rr-settings {
-    grid-template-columns: 1fr auto;
-  }
-
   .compact-form .form-head,
   .compact-form .note-field {
     grid-column: 1 / -1;
@@ -489,9 +487,18 @@ td:nth-child(7) {
 
   .metrics-grid,
   .compact-form,
-  .rr-settings,
   .field-row {
     grid-template-columns: 1fr;
+  }
+
+  .rr-settings {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .rr-settings label,
+  .rr-settings .ghost-button {
+    width: 100%;
   }
 
   .privacy-pill {
