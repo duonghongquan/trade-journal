@@ -1,5 +1,10 @@
 const SHEET_NAME = "trades";
+const SETTINGS_SHEET_NAME = "settings";
 const HEADERS = ["id", "date", "pair", "direction", "result", "profit", "rr", "note", "createdAt"];
+const DEFAULT_RR_RULES = [
+  { startDate: "2026-01-01", value: 5 },
+  { startDate: "2026-06-19", value: 10 },
+];
 
 function doGet(e) {
   const sheet = getSheet();
@@ -19,7 +24,7 @@ function doGet(e) {
       createdAt: Number(row[8]) || Date.now(),
     }));
 
-  return json({ ok: true, trades }, e);
+  return json({ ok: true, trades, rrRules: getRrRules() }, e);
 }
 
 function doPost(e) {
@@ -38,7 +43,57 @@ function doPost(e) {
     replaceAll(sheet, payload.trades || []);
   }
 
+  if (payload.action === "saveRrRules") {
+    saveRrRules(payload.rrRules || []);
+  }
+
   return json({ ok: true }, e);
+}
+
+function getSettingsSheet() {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = spreadsheet.getSheetByName(SETTINGS_SHEET_NAME) || spreadsheet.insertSheet(SETTINGS_SHEET_NAME);
+
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(["key", "value"]);
+  }
+
+  return sheet;
+}
+
+function getRrRules() {
+  const sheet = getSettingsSheet();
+  const values = sheet.getDataRange().getValues();
+  const row = values.find((item) => item[0] === "rrRules");
+
+  if (!row || !row[1]) return DEFAULT_RR_RULES;
+
+  try {
+    const parsed = JSON.parse(row[1]);
+    return Array.isArray(parsed) && parsed.length ? parsed : DEFAULT_RR_RULES;
+  } catch {
+    return DEFAULT_RR_RULES;
+  }
+}
+
+function saveRrRules(rules) {
+  const sheet = getSettingsSheet();
+  const normalizedRules = (Array.isArray(rules) && rules.length ? rules : DEFAULT_RR_RULES)
+    .map((rule) => ({
+      startDate: String(rule.startDate || "").slice(0, 10),
+      value: Number(rule.value),
+    }))
+    .filter((rule) => rule.startDate && rule.value > 0)
+    .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+  const values = sheet.getDataRange().getValues();
+  const index = values.findIndex((item) => item[0] === "rrRules");
+  const row = ["rrRules", JSON.stringify(normalizedRules.length ? normalizedRules : DEFAULT_RR_RULES)];
+
+  if (index >= 0) {
+    sheet.getRange(index + 1, 1, 1, 2).setValues([row]);
+  } else {
+    sheet.appendRow(row);
+  }
 }
 
 function getSheet() {

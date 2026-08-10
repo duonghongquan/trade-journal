@@ -50,9 +50,21 @@
         <div class="form-head">
           <div>
             <h2 id="formTitle">Nhập lệnh trade</h2>
-            <p>Trước 19/06: 1R = 5$. Từ 19/06: 1R = 10$. R:R có thể chỉnh tay.</p>
+            <p id="rrRuleSummary">R:R sẽ tự gợi ý theo mức 1R đang áp dụng. Bạn vẫn có thể chỉnh tay từng lệnh.</p>
           </div>
           <button class="ghost-button" type="button" id="resetForm">Làm mới</button>
+        </div>
+
+        <div class="rr-settings">
+          <label>
+            1R ($)
+            <input id="oneRValue" type="number" step="0.01" min="0.01" placeholder="10" />
+          </label>
+          <label>
+            Áp dụng từ ngày
+            <input id="oneRStartDate" type="date" />
+          </label>
+          <button class="ghost-button" type="button" id="saveOneRRule">Lưu mức R</button>
         </div>
 
         <input type="hidden" id="tradeId" />
@@ -178,6 +190,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=20260810-legacy-rr"></script>
+    <script src="./app.js?v=20260810-rr-rules"></script>
   </body>
 </html>

@@ -177,6 +177,18 @@ label {
   grid-column: 1 / -1;
 }
 
+.rr-settings {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 120px 180px auto 1fr;
+  gap: 10px;
+  align-items: end;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(11, 17, 23, 0.68);
+}
+
 .compact-form .note-field {
   min-width: 180px;
 }
@@ -452,6 +464,10 @@ td:nth-child(7) {
     grid-template-columns: repeat(3, 1fr);
   }
 
+  .rr-settings {
+    grid-template-columns: 1fr 1fr auto;
+  }
+
   .compact-form .form-head,
   .compact-form .note-field {
     grid-column: 1 / -1;
@@ -473,6 +489,7 @@ td:nth-child(7) {
 
   .metrics-grid,
   .compact-form,
+  .rr-settings,
   .field-row {
     grid-template-columns: 1fr;
   }

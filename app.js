@@ -1,4 +1,5 @@
 const STORAGE_KEY = "private-trade-journal-v1";
+const RR_RULES_KEY = "private-trade-journal-rr-rules-v1";
 const REMOTE_DB_URL =
   "https://script.google.com/macros/s/AKfycbzDQd69vlW_T4kcOQjnysea-SvltWCVCAP6yhzfWFWLfRp7A0JJ1BN2ZPyDIWGtCrms/exec";
 const HISTORICAL_IMPORT_KEY = "private-trade-journal-btc-history-v1-imported";
@@ -8,6 +9,11 @@ const REMOTE_LEGACY_RR_MIGRATION_KEY = "private-trade-journal-legacy-5usd-rr-rem
 const LEGACY_RR_CUTOFF_DATE = "2026-06-18";
 const ONE_R_VALUE = 10;
 const LEGACY_ONE_R_VALUE = 5;
+const DEFAULT_RR_RULES = [
+  { startDate: "2026-01-01", value: LEGACY_ONE_R_VALUE },
+  { startDate: "2026-06-19", value: ONE_R_VALUE },
+];
+let activeRrRules = loadRrRules();
 
 const seedTrades = [
   { date: "2026-07-17", pair: "XAU", direction: "SHORT", result: "LOSS", profit: -10, rr: -1, note: "" },
@@ -141,6 +147,7 @@ const historicalTrades = [...historicalBtcTrades, ...historicalOtherTrades];
 
 const state = {
   trades: loadTrades(),
+  rrRules: activeRrRules,
   chartMode: "profit",
   sortOrder: "newest",
   monthFilterInitialized: false,
@@ -166,6 +173,10 @@ const elements = {
   result: document.querySelector("#result"),
   profit: document.querySelector("#profit"),
   rr: document.querySelector("#rr"),
+  oneRValue: document.querySelector("#oneRValue"),
+  oneRStartDate: document.querySelector("#oneRStartDate"),
+  saveOneRRule: document.querySelector("#saveOneRRule"),
+  rrRuleSummary: document.querySelector("#rrRuleSummary"),
   note: document.querySelector("#note"),
   submitTrade: document.querySelector("#submitTrade"),
   resetForm: document.querySelector("#resetForm"),
@@ -210,6 +221,60 @@ function saveTrades() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.trades));
 }
 
+function loadRrRules() {
+  const saved = localStorage.getItem(RR_RULES_KEY);
+
+  try {
+    const parsed = saved ? JSON.parse(saved) : DEFAULT_RR_RULES;
+    return normalizeRrRules(parsed);
+  } catch {
+    return normalizeRrRules(DEFAULT_RR_RULES);
+  }
+}
+
+function saveRrRules() {
+  localStorage.setItem(RR_RULES_KEY, JSON.stringify(state.rrRules));
+}
+
+function normalizeRrRules(rules) {
+  const normalized = (Array.isArray(rules) ? rules : DEFAULT_RR_RULES)
+    .map((rule) => ({
+      startDate: normalizeDateValue(rule.startDate),
+      value: Number(rule.value),
+    }))
+    .filter((rule) => rule.startDate && Number.isFinite(rule.value) && rule.value > 0);
+
+  if (!normalized.length) return [...DEFAULT_RR_RULES];
+
+  return normalized.sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+}
+
+async function saveOneRRule() {
+  const value = Number(elements.oneRValue.value);
+  const startDate = elements.oneRStartDate.value;
+
+  if (!Number.isFinite(value) || value <= 0 || !startDate) {
+    alert("Nhập đủ mức 1R và ngày bắt đầu áp dụng.");
+    return;
+  }
+
+  const existingIndex = state.rrRules.findIndex((rule) => rule.startDate === startDate);
+  const nextRule = { startDate, value };
+
+  if (existingIndex >= 0) {
+    state.rrRules[existingIndex] = nextRule;
+  } else {
+    state.rrRules.push(nextRule);
+  }
+
+  state.rrRules = normalizeRrRules(state.rrRules);
+  activeRrRules = state.rrRules;
+  saveRrRules();
+  await sendRemoteAction("saveRrRules", { rrRules: state.rrRules });
+  updateRrRuleInputs();
+  suggestRrFromCurrentFields(true);
+}
+
 async function initializeRemoteStore() {
   const remoteTrades = await loadRemoteTrades();
 
@@ -228,6 +293,7 @@ async function initializeRemoteStore() {
   }
 
   await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
+  await sendRemoteAction("saveRrRules", { rrRules: state.rrRules });
   localStorage.setItem(REMOTE_LEGACY_RR_MIGRATION_KEY, "true");
 }
 
@@ -235,6 +301,7 @@ async function loadRemoteTrades() {
   try {
     const response = await fetch(REMOTE_DB_URL);
     const data = await response.json();
+    applyRemoteRrRules(data);
     return Array.isArray(data.trades) ? data.trades : [];
   } catch {
     return loadRemoteTradesJsonp();
@@ -252,6 +319,7 @@ function loadRemoteTradesJsonp() {
 
     window[callbackName] = (data) => {
       cleanup();
+      applyRemoteRrRules(data);
       resolve(Array.isArray(data.trades) ? data.trades : []);
     };
 
@@ -263,6 +331,17 @@ function loadRemoteTradesJsonp() {
     script.src = `${REMOTE_DB_URL}?callback=${callbackName}`;
     document.body.appendChild(script);
   });
+}
+
+function applyRemoteRrRules(data) {
+  if (!data || !Array.isArray(data.rrRules)) return;
+
+  state.rrRules = normalizeRrRules(data.rrRules);
+  activeRrRules = state.rrRules;
+  saveRrRules();
+  if (elements && elements.oneRValue) {
+    updateRrRuleInputs();
+  }
 }
 
 async function sendRemoteAction(action, payload) {
@@ -366,8 +445,12 @@ function profitToR(profit) {
 }
 
 function profitToRByDate(profit, date) {
-  const oneR = normalizeDateValue(date) <= LEGACY_RR_CUTOFF_DATE ? LEGACY_ONE_R_VALUE : ONE_R_VALUE;
+  const oneR = getOneRValueForDate(date);
   return Number((Number(profit) / oneR).toFixed(2));
+}
+
+function getOneRValueForDate(date) {
+  return getActiveRrRule(date).value;
 }
 
 function profitToResult(profit) {
@@ -788,22 +871,46 @@ function resetForm() {
   elements.pair.value = "XAU";
   elements.result.value = "LOSS";
   elements.rr.value = "";
+  elements.rr.dataset.manual = "false";
   elements.formTitle.textContent = "Nhập lệnh trade";
   elements.submitTrade.textContent = "Lưu lệnh";
+  updateRrRuleInputs();
 }
 
 function syncDerivedFields() {
+  suggestRrFromCurrentFields(false);
+}
+
+function suggestRrFromCurrentFields(force) {
   if (elements.profit.value === "") {
-    elements.rr.value = "";
+    if (force || elements.rr.dataset.manual !== "true") {
+      elements.rr.value = "";
+    }
     elements.result.value = "LOSS";
     return;
   }
 
   const profit = Number(elements.profit.value);
-  if (elements.rr.value === "") {
+  if (force || elements.rr.value === "" || elements.rr.dataset.manual !== "true") {
     elements.rr.value = profitToRByDate(profit, elements.tradeDate.value);
   }
   elements.result.value = profitToResult(profit);
+}
+
+function updateRrRuleInputs() {
+  const rule = getActiveRrRule(elements.tradeDate.value || new Date().toISOString().slice(0, 10));
+  elements.oneRValue.value = rule.value;
+  elements.oneRStartDate.value = rule.startDate;
+  elements.rrRuleSummary.textContent = `Đang áp dụng: 1R = $${rule.value} từ ${monthLabel(rule.startDate)}. R:R có thể chỉnh tay từng lệnh.`;
+}
+
+function getActiveRrRule(date) {
+  const targetDate = normalizeDateValue(date);
+  return (
+    [...activeRrRules]
+      .reverse()
+      .find((rule) => normalizeDateValue(rule.startDate) <= targetDate) || activeRrRules[activeRrRules.length - 1]
+  );
 }
 
 function render() {
@@ -859,6 +966,14 @@ elements.form.addEventListener("submit", async (event) => {
 
 elements.resetForm.addEventListener("click", resetForm);
 elements.profit.addEventListener("input", syncDerivedFields);
+elements.rr.addEventListener("input", () => {
+  elements.rr.dataset.manual = "true";
+});
+elements.tradeDate.addEventListener("change", () => {
+  updateRrRuleInputs();
+  suggestRrFromCurrentFields(false);
+});
+elements.saveOneRRule.addEventListener("click", saveOneRRule);
 elements.monthFilter.addEventListener("change", render);
 elements.pairFilter.addEventListener("change", render);
 elements.noteFilter.addEventListener("change", render);
@@ -933,6 +1048,7 @@ elements.tradeRows.addEventListener("click", async (event) => {
   elements.result.value = trade.result;
   elements.profit.value = trade.profit;
   elements.rr.value = trade.rr;
+  elements.rr.dataset.manual = "true";
   elements.note.value = trade.note;
   elements.formTitle.textContent = "Sửa lệnh trade";
   elements.submitTrade.textContent = "Cập nhật lệnh";
