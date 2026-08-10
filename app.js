@@ -3,7 +3,11 @@ const REMOTE_DB_URL =
   "https://script.google.com/macros/s/AKfycbzDQd69vlW_T4kcOQjnysea-SvltWCVCAP6yhzfWFWLfRp7A0JJ1BN2ZPyDIWGtCrms/exec";
 const HISTORICAL_IMPORT_KEY = "private-trade-journal-btc-history-v1-imported";
 const ALL_HISTORY_IMPORT_KEY = "private-trade-journal-all-history-v2-imported";
+const LOCAL_LEGACY_RR_MIGRATION_KEY = "private-trade-journal-legacy-5usd-rr-local-v1";
+const REMOTE_LEGACY_RR_MIGRATION_KEY = "private-trade-journal-legacy-5usd-rr-remote-v1";
+const LEGACY_RR_CUTOFF_DATE = "2026-06-18";
 const ONE_R_VALUE = 10;
+const LEGACY_ONE_R_VALUE = 5;
 
 const seedTrades = [
   { date: "2026-07-17", pair: "XAU", direction: "SHORT", result: "LOSS", profit: -10, rr: -1, note: "" },
@@ -92,7 +96,7 @@ const historicalBtcTrades = [
     sourceId,
     pair: "BTC",
     result: profitToResult(trade.profit),
-    rr: profitToR(trade.profit),
+    rr: profitToRByDate(trade.profit, trade.date),
     createdAt: 10000 + index,
   };
 });
@@ -128,7 +132,7 @@ const historicalOtherTrades = [
     id: sourceId,
     sourceId,
     result: profitToResult(trade.profit),
-    rr: profitToR(trade.profit),
+    rr: profitToRByDate(trade.profit, trade.date),
     createdAt: 20000 + index,
   };
 });
@@ -144,6 +148,10 @@ const state = {
   activeChartIndex: null,
 };
 
+if (localStorage.getItem(LOCAL_LEGACY_RR_MIGRATION_KEY) !== "true") {
+  state.trades = applyLegacyRrRule(state.trades);
+  localStorage.setItem(LOCAL_LEGACY_RR_MIGRATION_KEY, "true");
+}
 localStorage.setItem(STORAGE_KEY, JSON.stringify(state.trades));
 localStorage.setItem(HISTORICAL_IMPORT_KEY, "true");
 localStorage.setItem(ALL_HISTORY_IMPORT_KEY, "true");
@@ -206,13 +214,21 @@ async function initializeRemoteStore() {
   const remoteTrades = await loadRemoteTrades();
 
   if (remoteTrades.length) {
-    state.trades = normalizeTrades(remoteTrades);
+    state.trades =
+      localStorage.getItem(REMOTE_LEGACY_RR_MIGRATION_KEY) === "true"
+        ? normalizeTrades(remoteTrades)
+        : applyLegacyRrRule(remoteTrades);
     saveTrades();
     render();
+    if (localStorage.getItem(REMOTE_LEGACY_RR_MIGRATION_KEY) !== "true") {
+      await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
+      localStorage.setItem(REMOTE_LEGACY_RR_MIGRATION_KEY, "true");
+    }
     return;
   }
 
-  await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades) });
+  await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
+  localStorage.setItem(REMOTE_LEGACY_RR_MIGRATION_KEY, "true");
 }
 
 async function loadRemoteTrades() {
@@ -298,7 +314,22 @@ function normalizeTrades(trades) {
 
 function normalizeRValue(trade) {
   const rr = Number(trade.rr);
-  return Number.isFinite(rr) ? rr : profitToR(trade.profit);
+  return Number.isFinite(rr) ? rr : profitToRByDate(trade.profit, trade.date);
+}
+
+function applyLegacyRrRule(trades) {
+  return normalizeTrades(trades).map((trade) => {
+    if (!isLegacyRrTrade(trade)) return trade;
+
+    return {
+      ...trade,
+      rr: profitToRByDate(trade.profit, trade.date),
+    };
+  });
+}
+
+function isLegacyRrTrade(trade) {
+  return normalizeDateValue(trade.date) <= LEGACY_RR_CUTOFF_DATE;
 }
 
 function normalizeDateValue(value) {
@@ -332,6 +363,11 @@ function formatR(value) {
 
 function profitToR(profit) {
   return Number((Number(profit) / ONE_R_VALUE).toFixed(2));
+}
+
+function profitToRByDate(profit, date) {
+  const oneR = normalizeDateValue(date) <= LEGACY_RR_CUTOFF_DATE ? LEGACY_ONE_R_VALUE : ONE_R_VALUE;
+  return Number((Number(profit) / oneR).toFixed(2));
 }
 
 function profitToResult(profit) {
@@ -765,7 +801,7 @@ function syncDerivedFields() {
 
   const profit = Number(elements.profit.value);
   if (elements.rr.value === "") {
-    elements.rr.value = profitToR(profit);
+    elements.rr.value = profitToRByDate(profit, elements.tradeDate.value);
   }
   elements.result.value = profitToResult(profit);
 }
