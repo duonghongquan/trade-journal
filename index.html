@@ -10,8 +10,21 @@
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
-    <main class="app-shell">
+  <body class="access-locked">
+    <section class="access-gate" id="accessGate" aria-label="Mở khóa dashboard">
+      <form class="access-card" id="accessForm">
+        <h2>Nhập mật khẩu</h2>
+        <p>Dashboard đang được làm mờ để giữ riêng tư.</p>
+        <label>
+          Mật khẩu
+          <input id="accessPassword" type="password" autocomplete="current-password" required />
+        </label>
+        <button class="primary-button" type="submit">Mở khóa</button>
+        <small id="accessError" role="alert"></small>
+      </form>
+    </section>
+
+    <main class="app-shell protected-content">
       <header class="topbar">
         <div>
           <p class="eyebrow">Nhật ký giao dịch cá nhân</p>
@@ -185,6 +198,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=20260810-rr-rules-clean"></script>
+    <script src="./app.js?v=20260811-access-gate"></script>
   </body>
 </html>

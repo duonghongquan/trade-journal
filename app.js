@@ -1,5 +1,7 @@
 const STORAGE_KEY = "private-trade-journal-v1";
 const RR_RULES_KEY = "private-trade-journal-rr-rules-v1";
+const ACCESS_PASSWORD = "trade2026";
+const ACCESS_UNLOCK_KEY = "trade-journal-access-unlocked-v1";
 const REMOTE_DB_URL =
   "https://script.google.com/macros/s/AKfycbzDQd69vlW_T4kcOQjnysea-SvltWCVCAP6yhzfWFWLfRp7A0JJ1BN2ZPyDIWGtCrms/exec";
 const HISTORICAL_IMPORT_KEY = "private-trade-journal-btc-history-v1-imported";
@@ -164,6 +166,9 @@ localStorage.setItem(HISTORICAL_IMPORT_KEY, "true");
 localStorage.setItem(ALL_HISTORY_IMPORT_KEY, "true");
 
 const elements = {
+  accessForm: document.querySelector("#accessForm"),
+  accessPassword: document.querySelector("#accessPassword"),
+  accessError: document.querySelector("#accessError"),
   form: document.querySelector("#tradeForm"),
   formTitle: document.querySelector("#formTitle"),
   tradeId: document.querySelector("#tradeId"),
@@ -217,6 +222,22 @@ function loadTrades() {
 
 function saveTrades() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.trades));
+}
+
+function unlockAccess() {
+  document.body.classList.remove("access-locked");
+  sessionStorage.setItem(ACCESS_UNLOCK_KEY, "true");
+  elements.accessPassword.value = "";
+  elements.accessError.textContent = "";
+}
+
+function initializeAccessGate() {
+  if (sessionStorage.getItem(ACCESS_UNLOCK_KEY) === "true") {
+    unlockAccess();
+    return;
+  }
+
+  elements.accessPassword.focus();
 }
 
 function loadRrRules() {
@@ -931,6 +952,18 @@ function render() {
   elements.filterSummary.textContent = `Đang hiển thị ${trades.length} lệnh: ${monthText}, ${pairText}, ${noteText}.`;
 }
 
+elements.accessForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+
+  if (elements.accessPassword.value === ACCESS_PASSWORD) {
+    unlockAccess();
+    return;
+  }
+
+  elements.accessError.textContent = "Mật khẩu không đúng.";
+  elements.accessPassword.select();
+});
+
 elements.form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -1063,6 +1096,7 @@ elements.clearAll.addEventListener("click", async () => {
 
 window.addEventListener("resize", () => drawChart(filteredTrades()));
 
+initializeAccessGate();
 resetForm();
 render();
 initializeRemoteStore();
