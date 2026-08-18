@@ -744,6 +744,14 @@ function drawChart(trades) {
     },
     [0],
   );
+  const totalPnlValues = trades.reduce(
+    (points, trade) => {
+      const next = points[points.length - 1] + Number(trade.profit);
+      points.push(next);
+      return points;
+    },
+    [0],
+  );
 
   if (values.length <= 1) {
     state.chartPoints = [];
@@ -787,6 +795,7 @@ function drawChart(trades) {
     x: toX(index),
     y: toY(value),
     value,
+    totalPnl: totalPnlValues[index] || 0,
     index,
     trade: trades[index - 1] || null,
   }));
@@ -855,12 +864,12 @@ function drawChartTooltip(context, width, height) {
 
   const pnl = point.trade ? Number(point.trade.profit) : 0;
   const lines = point.trade
-    ? [`Lệnh ${point.index}`, `Ngày: ${monthLabel(point.trade.date)}`, `PnL: ${money(pnl)}`]
-    : ["Bắt đầu", "Ngày: --", "PnL: $0"];
+    ? [`Lệnh ${point.index}`, `Ngày: ${monthLabel(point.trade.date)}`, `PnL: ${money(pnl)}`, `Tổng PnL: ${money(point.totalPnl)}`]
+    : ["Bắt đầu", "Ngày: --", "PnL: $0", "Tổng PnL: $0"];
   const tooltipWidth = Math.max(...lines.map((line) => context.measureText(line).width)) + 24;
-  const tooltipHeight = 70;
+  const tooltipHeight = 88;
   const x = Math.min(Math.max(point.x - tooltipWidth / 2, 10), width - tooltipWidth - 10);
-  const y = point.y > 95 ? point.y - tooltipHeight - 14 : point.y + 16;
+  const y = point.y > 115 ? point.y - tooltipHeight - 14 : point.y + 16;
 
   context.fillStyle = "rgba(8, 13, 18, 0.94)";
   context.strokeStyle = "#35c987";
@@ -880,6 +889,9 @@ function drawChartTooltip(context, width, height) {
   context.fillStyle = pnl >= 0 ? "#35c987" : "#ff6b6b";
   context.font = "900 14px Inter, system-ui, sans-serif";
   context.fillText(lines[2], x + 12, y + 62);
+  context.fillStyle = point.totalPnl >= 0 ? "#35c987" : "#ff6b6b";
+  context.font = "900 14px Inter, system-ui, sans-serif";
+  context.fillText(lines[3], x + 12, y + 80);
   context.restore();
 }
 
