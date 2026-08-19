@@ -867,7 +867,22 @@ function drawChartTooltip(context, width, height) {
   const lines = point.trade
     ? [`Lệnh ${point.index}`, `Ngày: ${monthLabel(point.trade.date)}`, `PnL: ${money(pnl)}`, `Tổng PnL: ${money(point.totalPnl)}`]
     : ["Bắt đầu", "Ngày: --", "PnL: $0", "Tổng PnL: $0"];
-  const tooltipWidth = Math.max(...lines.map((line) => context.measureText(line).width)) + 24;
+  const tooltipFonts = [
+    "800 12px Inter, system-ui, sans-serif",
+    "700 12px Inter, system-ui, sans-serif",
+    "900 14px Inter, system-ui, sans-serif",
+    "900 14px Inter, system-ui, sans-serif",
+  ];
+  const tooltipPaddingX = 14;
+  const tooltipWidth =
+    Math.max(
+      ...lines.map((line, index) => {
+        context.font = tooltipFonts[index];
+        return context.measureText(line).width;
+      }),
+    ) +
+    tooltipPaddingX * 2 +
+    8;
   const tooltipHeight = 104;
   const x = Math.min(Math.max(point.x - tooltipWidth / 2, 10), width - tooltipWidth - 10);
   const y = point.y > 135 ? point.y - tooltipHeight - 14 : point.y + 16;
@@ -882,17 +897,17 @@ function drawChartTooltip(context, width, height) {
 
   context.textAlign = "left";
   context.fillStyle = "#eef5ef";
-  context.font = "800 12px Inter, system-ui, sans-serif";
-  context.fillText(lines[0], x + 12, y + 22);
+  context.font = tooltipFonts[0];
+  context.fillText(lines[0], x + tooltipPaddingX, y + 22);
   context.fillStyle = "#91a19b";
-  context.font = "700 12px Inter, system-ui, sans-serif";
-  context.fillText(lines[1], x + 12, y + 43);
+  context.font = tooltipFonts[1];
+  context.fillText(lines[1], x + tooltipPaddingX, y + 43);
   context.fillStyle = pnl >= 0 ? "#35c987" : "#ff6b6b";
-  context.font = "900 14px Inter, system-ui, sans-serif";
-  context.fillText(lines[2], x + 12, y + 62);
+  context.font = tooltipFonts[2];
+  context.fillText(lines[2], x + tooltipPaddingX, y + 62);
   context.fillStyle = point.totalPnl >= 0 ? "#35c987" : "#ff6b6b";
-  context.font = "900 14px Inter, system-ui, sans-serif";
-  context.fillText(lines[3], x + 12, y + 84);
+  context.font = tooltipFonts[3];
+  context.fillText(lines[3], x + tooltipPaddingX, y + 84);
   context.restore();
 }
 
