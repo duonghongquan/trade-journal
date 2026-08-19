@@ -843,8 +843,9 @@ function drawChart(trades) {
   });
 
   context.fillStyle = "#eef5ef";
-  context.textAlign = "center";
+  context.textAlign = "left";
   context.fillText("Bắt đầu", padding.left, height - 14);
+  context.textAlign = "right";
   context.fillText("Lệnh gần nhất", width - padding.right, height - 14);
   drawChartTooltip(context, width, height);
 }
