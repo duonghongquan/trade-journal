@@ -867,9 +867,9 @@ function drawChartTooltip(context, width, height) {
     ? [`Lệnh ${point.index}`, `Ngày: ${monthLabel(point.trade.date)}`, `PnL: ${money(pnl)}`, `Tổng PnL: ${money(point.totalPnl)}`]
     : ["Bắt đầu", "Ngày: --", "PnL: $0", "Tổng PnL: $0"];
   const tooltipWidth = Math.max(...lines.map((line) => context.measureText(line).width)) + 24;
-  const tooltipHeight = 88;
+  const tooltipHeight = 96;
   const x = Math.min(Math.max(point.x - tooltipWidth / 2, 10), width - tooltipWidth - 10);
-  const y = point.y > 115 ? point.y - tooltipHeight - 14 : point.y + 16;
+  const y = point.y > 125 ? point.y - tooltipHeight - 14 : point.y + 16;
 
   context.fillStyle = "rgba(8, 13, 18, 0.94)";
   context.strokeStyle = "#35c987";
@@ -891,7 +891,7 @@ function drawChartTooltip(context, width, height) {
   context.fillText(lines[2], x + 12, y + 62);
   context.fillStyle = point.totalPnl >= 0 ? "#35c987" : "#ff6b6b";
   context.font = "900 14px Inter, system-ui, sans-serif";
-  context.fillText(lines[3], x + 12, y + 80);
+  context.fillText(lines[3], x + 12, y + 82);
   context.restore();
 }
 
