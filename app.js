@@ -184,7 +184,6 @@ const elements = {
   submitTrade: document.querySelector("#submitTrade"),
   resetForm: document.querySelector("#resetForm"),
   totalProfit: document.querySelector("#totalProfit"),
-  totalR: document.querySelector("#totalR"),
   winrate: document.querySelector("#winrate"),
   tradeCount: document.querySelector("#tradeCount"),
   avgWin: document.querySelector("#avgWin"),
@@ -549,14 +548,13 @@ function calculateStats(trades) {
   const avgLoss = losses.length ? losses.reduce((sum, trade) => sum + Number(trade.profit), 0) / losses.length : 0;
   const winrate = trades.length ? (wins.length / trades.length) * 100 : 0;
 
-  return { totalProfit, totalR, avgWin, avgLoss, winrate, count: trades.length, winCount: wins.length, lossCount: losses.length };
+  return { totalProfit, avgWin, avgLoss, winrate, count: trades.length, winCount: wins.length, lossCount: losses.length };
 }
 
 function updateMetrics(trades) {
   const stats = calculateStats(trades);
   elements.totalProfit.textContent = money(stats.totalProfit);
   elements.totalProfit.className = stats.totalProfit >= 0 ? "positive" : "negative";
-  elements.totalR.textContent = formatR(stats.totalR);
   elements.winrate.textContent = `${stats.winrate.toFixed(1).replace(".", ",")}%`;
   elements.tradeCount.textContent = `${stats.count} lệnh`;
   elements.avgWin.textContent = money(stats.avgWin);
