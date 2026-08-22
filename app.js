@@ -465,6 +465,9 @@ function profitToR(profit) {
   return Number((Number(profit) / ONE_R_VALUE).toFixed(2));
 }
 
+function tradeRValue(trade) {
+  return profitToRByDate(trade.profit, trade.date);
+}
 function profitToRByDate(profit, date) {
   const oneR = getOneRValueForDate(date);
   return Number((Number(profit) / oneR).toFixed(2));
@@ -541,7 +544,7 @@ function calculateStats(trades) {
   const wins = trades.filter((trade) => trade.result === "WIN");
   const losses = trades.filter((trade) => trade.result === "LOSS");
   const totalProfit = trades.reduce((sum, trade) => sum + Number(trade.profit), 0);
-  const totalR = trades.reduce((sum, trade) => sum + Number(trade.rr), 0);
+  const totalR = trades.reduce((sum, trade) => sum + tradeRValue(trade), 0);
   const avgWin = wins.length ? wins.reduce((sum, trade) => sum + Number(trade.profit), 0) / wins.length : 0;
   const avgLoss = losses.length ? losses.reduce((sum, trade) => sum + Number(trade.profit), 0) / losses.length : 0;
   const winrate = trades.length ? (wins.length / trades.length) * 100 : 0;
@@ -647,12 +650,12 @@ function exportTradesToExcel() {
       trade.direction,
       trade.result,
       Number(trade.profit),
-      formatR(Number(trade.rr)),
+      formatR(tradeRValue(trade)),
       trade.note || "",
     ]),
   ];
   const totalProfit = trades.reduce((sum, trade) => sum + Number(trade.profit), 0);
-  const totalR = trades.reduce((sum, trade) => sum + Number(trade.rr), 0);
+  const totalR = trades.reduce((sum, trade) => sum + tradeRValue(trade), 0);
   rows.push(["TỔNG", "", "", "", "", totalProfit, formatR(totalR), ""]);
 
   const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
@@ -742,7 +745,8 @@ function drawChart(trades) {
 
   const values = trades.reduce(
     (points, trade) => {
-      const next = points[points.length - 1] + Number(trade[state.chartMode]);
+      const tradeValue = state.chartMode === "rr" ? tradeRValue(trade) : Number(trade.profit);
+      const next = points[points.length - 1] + tradeValue;
       points.push(next);
       return points;
     },
