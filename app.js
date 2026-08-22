@@ -189,6 +189,8 @@ const elements = {
   tradeCount: document.querySelector("#tradeCount"),
   avgWin: document.querySelector("#avgWin"),
   avgLoss: document.querySelector("#avgLoss"),
+  winTradeCount: document.querySelector("#winTradeCount"),
+  lossTradeCount: document.querySelector("#lossTradeCount"),
   growthChart: document.querySelector("#growthChart"),
   tradeRows: document.querySelector("#tradeRows"),
   monthFilter: document.querySelector("#monthFilter"),
@@ -544,7 +546,7 @@ function calculateStats(trades) {
   const avgLoss = losses.length ? losses.reduce((sum, trade) => sum + Number(trade.profit), 0) / losses.length : 0;
   const winrate = trades.length ? (wins.length / trades.length) * 100 : 0;
 
-  return { totalProfit, totalR, avgWin, avgLoss, winrate, count: trades.length };
+  return { totalProfit, totalR, avgWin, avgLoss, winrate, count: trades.length, winCount: wins.length, lossCount: losses.length };
 }
 
 function updateMetrics(trades) {
@@ -556,6 +558,8 @@ function updateMetrics(trades) {
   elements.tradeCount.textContent = `${stats.count} lệnh`;
   elements.avgWin.textContent = money(stats.avgWin);
   elements.avgLoss.textContent = money(stats.avgLoss);
+  elements.winTradeCount.textContent = `${stats.winCount} lệnh thắng`;
+  elements.lossTradeCount.textContent = `${stats.lossCount} lệnh thua`;
 }
 
 function updateSortIcon() {
@@ -1128,3 +1132,4 @@ initializeAccessGate();
 resetForm();
 render();
 initializeRemoteStore();
+
