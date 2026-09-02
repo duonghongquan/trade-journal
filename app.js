@@ -1,5 +1,7 @@
 const STORAGE_KEY = "private-trade-journal-v1";
 const RR_RULES_KEY = "private-trade-journal-rr-rules-v1";
+const DATASET_VERSION_KEY = "private-trade-journal-dataset-version-v1";
+const CURRENT_DATASET_VERSION = "20260902-sheet-images-v1";
 const DELETED_TRADE_IDS_KEY = "private-trade-journal-deleted-ids-v1";
 const ACCESS_PASSWORD = "trade2026";
 const ACCESS_UNLOCK_KEY = "trade-journal-access-unlocked-v1";
@@ -18,6 +20,7 @@ const DEFAULT_RR_RULES = [
 ];
 let activeRrRules = loadRrRules();
 const HAD_LOCAL_TRADES = localStorage.getItem(STORAGE_KEY) !== null;
+const SHOULD_RESET_TO_SHEET_IMAGES = HAD_LOCAL_TRADES && localStorage.getItem(DATASET_VERSION_KEY) !== CURRENT_DATASET_VERSION;
 
 const seedTrades = [
   { date: "2026-07-17", pair: "XAU", direction: "SHORT", result: "LOSS", profit: -10, rr: -1, note: "" },
@@ -148,17 +151,165 @@ const historicalOtherTrades = [
 });
 
 const historicalTrades = [...historicalBtcTrades, ...historicalOtherTrades];
+function sheetTrade(month, stt, day, pair, direction, profit, note = "") {
+  return {
+    id: `sheet-2026-${month}-${String(stt).padStart(3, "0")}`,
+    sourceId: `sheet-2026-${month}-${String(stt).padStart(3, "0")}`,
+    date: `2026-${month}-${String(day).padStart(2, "0")}`,
+    pair,
+    direction,
+    result: profitToResult(profit),
+    profit,
+    rr: profitToRByDate(profit, `2026-${month}-${String(day).padStart(2, "0")}`),
+    note,
+    createdAt: Number(`2026${month}${String(day).padStart(2, "0")}${String(stt).padStart(3, "0")}`),
+  };
+}
+
+const sheetImageTrades = [
+  sheetTrade("04", 1, 1, "ETH", "SHORT", -6, "Ngược xu hướng"),
+  sheetTrade("04", 2, 2, "SOL", "SHORT", -5),
+  sheetTrade("04", 3, 3, "ETH", "SHORT", -5),
+  sheetTrade("04", 4, 6, "ETH", "SHORT", -6, "Ngược xu hướng"),
+  sheetTrade("04", 5, 10, "BTC", "SHORT", -6, "Ngược xu hướng"),
+  sheetTrade("04", 6, 10, "BTC", "LONG", 5),
+  sheetTrade("04", 7, 10, "XAU", "LONG", -5),
+  sheetTrade("04", 8, 11, "BTC", "SHORT", -5, "Ngược xu hướng"),
+  sheetTrade("04", 9, 12, "BTC", "LONG", 6.5),
+  sheetTrade("04", 10, 13, "XAU", "SHORT", 5.5, "kéo bot"),
+  sheetTrade("04", 11, 13, "BTC", "SHORT", -9),
+  sheetTrade("04", 12, 13, "BTC", "LONG", 15),
+  sheetTrade("04", 13, 14, "XAU", "SHORT", -5, "kéo bot"),
+  sheetTrade("04", 14, 14, "XAU", "LONG", 5),
+  sheetTrade("04", 15, 15, "BTC", "SHORT", -5, "Ngược xu hướng"),
+  sheetTrade("04", 16, 15, "XAU", "LONG", 7.5),
+  sheetTrade("04", 17, 15, "BTC", "LONG", -5),
+  sheetTrade("04", 18, 15, "XAU", "LONG", -3.5),
+  sheetTrade("04", 19, 15, "BTC", "SHORT", -5, "Ngược xu hướng"),
+  sheetTrade("04", 20, 17, "XAU", "LONG", 5),
+  sheetTrade("04", 21, 17, "BTC", "LONG", 12.5),
+  sheetTrade("04", 22, 19, "BTC", "SHORT", 5, "Ngược xu hướng"),
+  sheetTrade("04", 23, 20, "BTC", "LONG", 1.5),
+  sheetTrade("04", 24, 21, "XAU", "SHORT", -5),
+  sheetTrade("04", 25, 21, "XAU", "SHORT", 7.5),
+  sheetTrade("04", 26, 22, "XAU", "SHORT", 9),
+  sheetTrade("04", 27, 22, "BTC", "SHORT", 1.5, "Ngược xu hướng"),
+  sheetTrade("04", 28, 23, "BTC", "LONG", -5.5),
+  sheetTrade("04", 29, 23, "BTC", "SHORT", -6, "Ngược xu hướng"),
+  sheetTrade("04", 30, 23, "XAU", "LONG", -4.5, "Ngược xu hướng"),
+  sheetTrade("04", 31, 23, "XAU", "SHORT", 9),
+  sheetTrade("04", 32, 24, "XAU", "LONG", 5, "Ngược xu hướng"),
+  sheetTrade("04", 33, 27, "BTC", "SHORT", 5),
+  sheetTrade("04", 34, 29, "XAU", "LONG", -5, "Ngược xu hướng"),
+  sheetTrade("04", 35, 29, "XAU", "SHORT", 9.5),
+  sheetTrade("04", 36, 30, "BTC", "SHORT", -8),
+  sheetTrade("04", 37, 30, "XAU", "SHORT", -5),
+  sheetTrade("05", 1, 1, "BTC", "LONG", 7),
+  sheetTrade("05", 2, 2, "BTC", "LONG", 9.5),
+  sheetTrade("05", 3, 3, "BTC", "SHORT", -5.5),
+  sheetTrade("05", 4, 5, "XAU", "LONG", -2.5),
+  sheetTrade("05", 5, 5, "XAU", "SHORT", -7.5),
+  sheetTrade("05", 6, 5, "XAU", "LONG", 10),
+  sheetTrade("05", 7, 7, "BTC", "SHORT", 5),
+  sheetTrade("05", 8, 13, "BTC", "SHORT", -5.5),
+  sheetTrade("05", 9, 16, "BTC", "SHORT", 6),
+  sheetTrade("05", 10, 21, "BTC", "SHORT", -6),
+  sheetTrade("05", 11, 26, "BTC", "SHORT", -5.5),
+  sheetTrade("05", 12, 27, "BTC", "SHORT", 15),
+  sheetTrade("06", 1, 1, "BTC", "SHORT", 10.5),
+  sheetTrade("06", 2, 2, "BTC", "LONG", -5.5, "bắt đáy"),
+  sheetTrade("06", 3, 2, "BTC", "LONG", -5, "bắt đáy"),
+  sheetTrade("06", 4, 3, "BTC", "LONG", -6, "bắt đáy"),
+  sheetTrade("06", 5, 7, "BTC", "LONG", 10, "ngược xu hướng, m15 có cấu trúc tăng"),
+  sheetTrade("06", 6, 8, "BTC", "LONG", -5, "ngược xu hướng"),
+  sheetTrade("06", 7, 18, "BTC", "SHORT", 5),
+  sheetTrade("06", 8, 20, "BTC", "SHORT", -10),
+  sheetTrade("06", 9, 23, "BTC", "SHORT", 4.5),
+  sheetTrade("06", 10, 24, "BTC", "SHORT", 15),
+  sheetTrade("06", 11, 26, "BTC", "LONG", 7, "ngược xu hướng"),
+  sheetTrade("06", 12, 28, "BTC", "SHORT", -10.5),
+  sheetTrade("06", 13, 28, "BTC", "SHORT", 15),
+  sheetTrade("06", 14, 29, "BTC", "LONG", -10, "ngược xu hướng"),
+  sheetTrade("06", 15, 29, "BTC", "SHORT", -10),
+  sheetTrade("06", 16, 30, "BTC", "SHORT", 10),
+  sheetTrade("06", 17, 30, "BTC", "SHORT", -10),
+  sheetTrade("07", 1, 1, "BTC", "SHORT", -10),
+  sheetTrade("07", 2, 2, "BTC", "LONG", 10, "thuận ema m15 h1, nằm giữa ema h4"),
+  sheetTrade("07", 3, 3, "BTC", "LONG", 5),
+  sheetTrade("07", 4, 4, "BTC", "LONG", 10),
+  sheetTrade("07", 5, 7, "BTC", "LONG", 5),
+  sheetTrade("07", 6, 8, "BTC", "SHORT", -10),
+  sheetTrade("07", 7, 9, "BTC", "LONG", 20),
+  sheetTrade("07", 8, 11, "BTC", "LONG", -10.5),
+  sheetTrade("07", 9, 13, "BTC", "SHORT", 10.5, "thuận ema m15 h1, nằm giữa ema h4"),
+  sheetTrade("07", 10, 14, "BTC", "SHORT", -10, "ngược m15"),
+  sheetTrade("07", 11, 15, "BTC", "LONG", -10),
+  sheetTrade("07", 12, 19, "BTC", "LONG", -10.5),
+  sheetTrade("07", 13, 20, "BTC", "SHORT", -9.5, "thuận ema m15 h1, nằm giữa ema h4"),
+  sheetTrade("07", 14, 24, "BTC", "SHORT", 8, "thuận ema m15 h1, nằm giữa ema h4"),
+  sheetTrade("07", 15, 26, "BTC", "LONG", 10.5),
+  sheetTrade("07", 16, 27, "BTC", "LONG", -10),
+  sheetTrade("07", 17, 28, "BTC", "SHORT", 6),
+  sheetTrade("07", 18, 29, "BTC", "SHORT", -10),
+  sheetTrade("07", 19, 30, "BTC", "SHORT", -10.5),
+  sheetTrade("07", 20, 31, "BTC", "LONG", -17),
+  sheetTrade("07", 21, 31, "BTC", "SHORT", 6.5),
+  sheetTrade("08", 1, 1, "BTC", "SHORT", 3),
+  sheetTrade("08", 2, 3, "XAU", "SHORT", 5.5),
+  sheetTrade("08", 3, 3, "BTC", "SHORT", 7),
+  sheetTrade("08", 4, 3, "XAU", "LONG", -9.5),
+  sheetTrade("08", 5, 3, "XAU", "SHORT", -10),
+  sheetTrade("08", 6, 3, "XAU", "LONG", 6),
+  sheetTrade("08", 7, 4, "BTC", "SHORT", -10.5, "EMA thuận h4 m15 ngược h1"),
+  sheetTrade("08", 8, 5, "BTC", "SHORT", -11, "Ngược xu hướng"),
+  sheetTrade("08", 9, 5, "BTC", "LONG", -11),
+  sheetTrade("08", 10, 9, "XAU", "LONG", 8),
+  sheetTrade("08", 11, 10, "XAU", "SHORT", -10, "Ngược xu hướng"),
+  sheetTrade("08", 12, 11, "BTC", "SHORT", 11),
+  sheetTrade("08", 13, 11, "XAU", "LONG", 7),
+  sheetTrade("08", 14, 16, "XAU", "LONG", 6.5),
+  sheetTrade("08", 15, 17, "BTC", "LONG", 7, "thuận ema h1 m15 nằm giữa ema h4"),
+  sheetTrade("08", 16, 17, "XAU", "SHORT", 10, "thuận ema h1 m15 nằm giữa ema h4"),
+  sheetTrade("08", 17, 17, "BTC", "LONG", 8),
+  sheetTrade("08", 18, 20, "XAU", "SHORT", -10, "Ngược xu hướng"),
+  sheetTrade("08", 19, 20, "BTC", "SHORT", 3.5, "Ngược xu hướng"),
+  sheetTrade("08", 20, 20, "BTC", "SHORT", 15, "Ngược xu hướng"),
+  sheetTrade("08", 21, 21, "BTC", "LONG", -10),
+  sheetTrade("08", 22, 22, "BTC", "LONG", -10),
+  sheetTrade("08", 23, 22, "BTC", "SHORT", -7, "Ngược xu hướng"),
+  sheetTrade("08", 24, 22, "BTC", "LONG", 17.5),
+  sheetTrade("08", 25, 23, "XAU", "LONG", 8),
+  sheetTrade("08", 26, 23, "XAU", "LONG", 10),
+  sheetTrade("08", 27, 24, "XAU", "SHORT", -10, "Ngược xu hướng"),
+  sheetTrade("08", 28, 24, "BTC", "LONG", -10),
+  sheetTrade("08", 29, 24, "XAU", "LONG", -11),
+  sheetTrade("08", 30, 25, "BTC", "LONG", -10),
+  sheetTrade("08", 31, 26, "XAU", "LONG", 5),
+  sheetTrade("08", 32, 26, "BTC", "LONG", 9),
+  sheetTrade("08", 33, 26, "BTC", "LONG", 5),
+  sheetTrade("08", 34, 29, "BTC", "SHORT", -10.5, "thuận ema h1 m15 nằm giữa ema h4"),
+  sheetTrade("08", 35, 30, "BTC", "LONG", -10.5),
+];
 
 const state = {
   trades: loadTrades(),
   rrRules: activeRrRules,
   deletedTradeIds: loadDeletedTradeIds(),
+  forceRemoteReplace: SHOULD_RESET_TO_SHEET_IMAGES,
   chartMode: "profit",
   sortOrder: "newest",
   monthFilterInitialized: false,
   chartPoints: [],
   activeChartIndex: null,
 };
+
+if (SHOULD_RESET_TO_SHEET_IMAGES) {
+  state.trades = normalizeTrades(sheetImageTrades);
+  state.deletedTradeIds.clear();
+  saveDeletedTradeIds();
+  saveTrades();
+  localStorage.setItem(DATASET_VERSION_KEY, CURRENT_DATASET_VERSION);
+}
 
 if (localStorage.getItem(LOCAL_LEGACY_RR_MIGRATION_KEY) !== "true") {
   state.trades = applyLegacyRrRule(state.trades);
@@ -320,6 +471,14 @@ async function saveOneRRule() {
 async function initializeRemoteStore() {
   const remoteTrades = await loadRemoteTrades();
 
+  if (state.forceRemoteReplace) {
+    await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
+    await sendRemoteAction("saveRrRules", { rrRules: state.rrRules });
+    localStorage.setItem(REMOTE_LEGACY_RR_MIGRATION_KEY, "true");
+    state.forceRemoteReplace = false;
+    return;
+  }
+
   if (remoteTrades.length) {
     const normalizedRemoteTrades =
       localStorage.getItem(REMOTE_LEGACY_RR_MIGRATION_KEY) === "true"
@@ -401,10 +560,14 @@ async function sendRemoteAction(action, payload) {
   }
 }
 
+function remoteSheetDate(date) {
+  return `="${normalizeDateValue(date)}"`;
+}
+
 function remoteTradePayload(trade) {
   return {
     id: trade.id,
-    date: trade.date,
+    date: remoteSheetDate(trade.date),
     pair: trade.pair,
     direction: trade.direction,
     result: trade.result,
@@ -470,7 +633,11 @@ function isLegacyRrTrade(trade) {
 }
 
 function normalizeDateValue(value) {
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  if (typeof value === "string") {
+    const formulaDate = value.match(/^="(\d{4}-\d{2}-\d{2})"$/);
+    if (formulaDate) return formulaDate[1];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  }
 
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return String(value || "").slice(0, 10);

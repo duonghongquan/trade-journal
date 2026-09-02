@@ -151,7 +151,11 @@ function formatSheetDate(value) {
     return Utilities.formatDate(value, Session.getScriptTimeZone(), "yyyy-MM-dd");
   }
 
-  return String(value || "").slice(0, 10);
+  const text = String(value || "");
+  const formulaDate = text.match(/^="(\d{4}-\d{2}-\d{2})"$/);
+  if (formulaDate) return formulaDate[1];
+
+  return text.slice(0, 10);
 }
 
 function json(data, e) {
@@ -161,3 +165,4 @@ function json(data, e) {
 
   return ContentService.createTextOutput(output).setMimeType(mimeType);
 }
+
