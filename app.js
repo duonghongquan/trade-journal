@@ -1,5 +1,6 @@
 const STORAGE_KEY = "private-trade-journal-v1";
 const RR_RULES_KEY = "private-trade-journal-rr-rules-v1";
+const DELETED_TRADE_IDS_KEY = "private-trade-journal-deleted-ids-v1";
 const ACCESS_PASSWORD = "trade2026";
 const ACCESS_UNLOCK_KEY = "trade-journal-access-unlocked-v1";
 const REMOTE_DB_URL =
@@ -16,6 +17,7 @@ const DEFAULT_RR_RULES = [
   { startDate: "2026-06-19", value: ONE_R_VALUE },
 ];
 let activeRrRules = loadRrRules();
+const HAD_LOCAL_TRADES = localStorage.getItem(STORAGE_KEY) !== null;
 
 const seedTrades = [
   { date: "2026-07-17", pair: "XAU", direction: "SHORT", result: "LOSS", profit: -10, rr: -1, note: "" },
@@ -150,6 +152,7 @@ const historicalTrades = [...historicalBtcTrades, ...historicalOtherTrades];
 const state = {
   trades: loadTrades(),
   rrRules: activeRrRules,
+  deletedTradeIds: loadDeletedTradeIds(),
   chartMode: "profit",
   sortOrder: "newest",
   monthFilterInitialized: false,
@@ -223,6 +226,25 @@ function loadTrades() {
 
 function saveTrades() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.trades));
+}
+
+function loadDeletedTradeIds() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DELETED_TRADE_IDS_KEY) || "[]");
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDeletedTradeIds() {
+  localStorage.setItem(DELETED_TRADE_IDS_KEY, JSON.stringify([...state.deletedTradeIds]));
+}
+
+function rememberDeletedTrade(id) {
+  if (!id) return;
+  state.deletedTradeIds.add(id);
+  saveDeletedTradeIds();
 }
 
 function unlockAccess() {
@@ -299,16 +321,16 @@ async function initializeRemoteStore() {
   const remoteTrades = await loadRemoteTrades();
 
   if (remoteTrades.length) {
-    state.trades =
+    const normalizedRemoteTrades =
       localStorage.getItem(REMOTE_LEGACY_RR_MIGRATION_KEY) === "true"
         ? normalizeTrades(remoteTrades)
         : applyLegacyRrRule(remoteTrades);
+    const localTradesToMerge = HAD_LOCAL_TRADES ? state.trades : [];
+    state.trades = mergeRemoteTradesById(localTradesToMerge, normalizedRemoteTrades);
     saveTrades();
     render();
-    if (localStorage.getItem(REMOTE_LEGACY_RR_MIGRATION_KEY) !== "true") {
-      await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
-      localStorage.setItem(REMOTE_LEGACY_RR_MIGRATION_KEY, "true");
-    }
+    await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
+    localStorage.setItem(REMOTE_LEGACY_RR_MIGRATION_KEY, "true");
     return;
   }
 
@@ -402,6 +424,22 @@ function mergeTradesById(currentTrades, importedTrades) {
   return [...map.values()];
 }
 
+function mergeRemoteTradesById(localTrades, remoteTrades) {
+  const deletedIds = state.deletedTradeIds || new Set();
+  const map = new Map();
+
+  normalizeTrades(remoteTrades).forEach((trade) => {
+    if (!trade.id) trade.id = crypto.randomUUID();
+    if (!deletedIds.has(trade.id)) map.set(trade.id, trade);
+  });
+
+  normalizeTrades(localTrades).forEach((trade) => {
+    if (!trade.id) trade.id = crypto.randomUUID();
+    if (!deletedIds.has(trade.id)) map.set(trade.id, trade);
+  });
+
+  return [...map.values()];
+}
 function normalizeTrades(trades) {
   return trades.map((trade) => ({
     ...trade,
@@ -1021,6 +1059,8 @@ elements.form.addEventListener("submit", async (event) => {
     state.trades.push(payload);
   }
 
+  state.deletedTradeIds.delete(payload.id);
+  saveDeletedTradeIds();
   saveTrades();
   await sendRemoteAction("upsert", { trade: remoteTradePayload(payload) });
   resetForm();
@@ -1097,6 +1137,7 @@ elements.tradeRows.addEventListener("click", async (event) => {
   if (button.dataset.action === "delete") {
     const ok = confirm("Xóa lệnh trade này?");
     if (!ok) return;
+    rememberDeletedTrade(trade.id);
     state.trades = state.trades.filter((item) => item.id !== trade.id);
     saveTrades();
     await sendRemoteAction("delete", { id: trade.id });
@@ -1121,6 +1162,7 @@ elements.tradeRows.addEventListener("click", async (event) => {
 elements.clearAll.addEventListener("click", async () => {
   const ok = confirm("Xóa tất cả lệnh đang lưu trên trình duyệt này?");
   if (!ok) return;
+  state.trades.forEach((trade) => rememberDeletedTrade(trade.id));
   state.trades = [];
   saveTrades();
   await sendRemoteAction("replaceAll", { trades: [] });
