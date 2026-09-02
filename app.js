@@ -1,7 +1,7 @@
 const STORAGE_KEY = "private-trade-journal-v1";
 const RR_RULES_KEY = "private-trade-journal-rr-rules-v1";
 const DATASET_VERSION_KEY = "private-trade-journal-dataset-version-v1";
-const CURRENT_DATASET_VERSION = "20260902-sheet-images-v1";
+const CURRENT_DATASET_VERSION = "20260902-sheet-images-v2";
 const DELETED_TRADE_IDS_KEY = "private-trade-journal-deleted-ids-v1";
 const ACCESS_PASSWORD = "trade2026";
 const ACCESS_UNLOCK_KEY = "trade-journal-access-unlocked-v1";
@@ -166,6 +166,23 @@ function sheetTrade(month, stt, day, pair, direction, profit, note = "") {
   };
 }
 
+function sheetTradeGroup(group, month, stt, day, pair, direction, profit, note = "") {
+  const date = `2026-${month}-${String(day).padStart(2, "0")}`;
+  const id = `sheet-2026-${group}-${String(stt).padStart(3, "0")}`;
+
+  return {
+    id,
+    sourceId: id,
+    date,
+    pair,
+    direction,
+    result: profitToResult(profit),
+    profit,
+    rr: profitToRByDate(profit, date),
+    note,
+    createdAt: Number(`2026${month}${String(day).padStart(2, "0")}${String(stt).padStart(3, "0")}`),
+  };
+}
 const sheetImageTrades = [
   sheetTrade("04", 1, 1, "ETH", "SHORT", -6, "Ngược xu hướng"),
   sheetTrade("04", 2, 2, "SOL", "SHORT", -5),
@@ -254,6 +271,17 @@ const sheetImageTrades = [
   sheetTrade("07", 19, 30, "BTC", "SHORT", -10.5),
   sheetTrade("07", 20, 31, "BTC", "LONG", -17),
   sheetTrade("07", 21, 31, "BTC", "SHORT", 6.5),
+  sheetTradeGroup("07-xau", "07", 1, 17, "XAU", "SHORT", -10),
+  sheetTradeGroup("07-xau", "07", 2, 20, "XAU", "SHORT", -10, "thuận ema m15 h1, nằm giữa ema h4"),
+  sheetTradeGroup("07-xau", "07", 3, 20, "XAU", "LONG", -10),
+  sheetTradeGroup("07-xau", "07", 4, 20, "XAU", "SHORT", -10),
+  sheetTradeGroup("07-xau", "07", 5, 23, "XAU", "LONG", -10),
+  sheetTradeGroup("07-xau", "07", 6, 28, "XAU", "SHORT", 5),
+  sheetTradeGroup("07-xau", "07", 7, 29, "XAU", "SHORT", -10),
+  sheetTradeGroup("07-xau", "07", 8, 29, "XAU", "SHORT", 4),
+  sheetTradeGroup("07-xau", "07", 9, 30, "XAU", "LONG", 3),
+  sheetTradeGroup("07-xau", "07", 10, 30, "XAU", "LONG", 3),
+  sheetTradeGroup("07-xau", "07", 11, 31, "XAU", "LONG", -9),
   sheetTrade("08", 1, 1, "BTC", "SHORT", 3),
   sheetTrade("08", 2, 3, "XAU", "SHORT", 5.5),
   sheetTrade("08", 3, 3, "BTC", "SHORT", 7),
