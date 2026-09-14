@@ -1,6 +1,6 @@
 const SHEET_NAME = "trades";
 const SETTINGS_SHEET_NAME = "settings";
-const HEADERS = ["id", "date", "pair", "direction", "result", "profit", "rr", "note", "createdAt"];
+const HEADERS = ["id", "date", "pair", "direction", "result", "profit", "rr", "note", "createdAt", "updatedAt"];
 const DEFAULT_RR_RULES = [
   { startDate: "2026-01-01", value: 5 },
   { startDate: "2026-06-19", value: 10 },
@@ -22,6 +22,7 @@ function doGet(e) {
       rr: Number(row[6]),
       note: row[7] || "",
       createdAt: Number(row[8]) || Date.now(),
+      updatedAt: Number(row[9]) || Number(row[8]) || Date.now(),
     }));
 
   return json({ ok: true, trades, rrRules: getRrRules() }, e);
@@ -120,6 +121,7 @@ function upsertTrade(sheet, trade) {
     Number(trade.rr),
     trade.note || "",
     Number(trade.createdAt) || Date.now(),
+    Number(trade.updatedAt) || Number(trade.createdAt) || Date.now(),
   ];
   const ids = sheet.getRange(2, 1, Math.max(sheet.getLastRow() - 1, 1), 1).getValues().flat();
   const index = ids.findIndex((id) => String(id) === String(trade.id));
@@ -165,4 +167,3 @@ function json(data, e) {
 
   return ContentService.createTextOutput(output).setMimeType(mimeType);
 }
-

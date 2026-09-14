@@ -602,7 +602,8 @@ function remoteTradePayload(trade) {
     profit: Number(trade.profit),
     rr: Number(trade.rr),
     note: trade.note || "",
-    createdAt: Number(trade.createdAt) || Date.now(),
+    createdAt: tradeModifiedAt(trade) || Date.now(),
+    updatedAt: tradeModifiedAt(trade) || Date.now(),
   };
 }
 
@@ -618,18 +619,24 @@ function mergeTradesById(currentTrades, importedTrades) {
 function mergeRemoteTradesById(localTrades, remoteTrades) {
   const deletedIds = state.deletedTradeIds || new Set();
   const map = new Map();
-
-  normalizeTrades(remoteTrades).forEach((trade) => {
+  const keepNewest = (trade) => {
     if (!trade.id) trade.id = crypto.randomUUID();
-    if (!deletedIds.has(trade.id)) map.set(trade.id, trade);
-  });
+    if (deletedIds.has(trade.id)) return;
 
-  normalizeTrades(localTrades).forEach((trade) => {
-    if (!trade.id) trade.id = crypto.randomUUID();
-    if (!deletedIds.has(trade.id)) map.set(trade.id, trade);
-  });
+    const existing = map.get(trade.id);
+    if (!existing || tradeModifiedAt(trade) >= tradeModifiedAt(existing)) {
+      map.set(trade.id, trade);
+    }
+  };
+
+  normalizeTrades(remoteTrades).forEach(keepNewest);
+  normalizeTrades(localTrades).forEach(keepNewest);
 
   return [...map.values()];
+}
+
+function tradeModifiedAt(trade) {
+  return Number(trade.updatedAt) || Number(trade.createdAt) || 0;
 }
 function normalizeTrades(trades) {
   return trades.map((trade) => ({
@@ -637,6 +644,8 @@ function normalizeTrades(trades) {
     date: normalizeDateValue(trade.date),
     result: profitToResult(trade.profit),
     rr: normalizeRValue(trade),
+    createdAt: Number(trade.createdAt) || Date.now(),
+    updatedAt: Number(trade.updatedAt) || Number(trade.createdAt) || Date.now(),
   }));
 }
 
@@ -1234,6 +1243,8 @@ elements.accessForm.addEventListener("submit", (event) => {
 elements.form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
+  const now = Date.now();
+  const existingTrade = elements.tradeId.value ? state.trades.find((trade) => trade.id === elements.tradeId.value) : null;
   const payload = {
     id: elements.tradeId.value || crypto.randomUUID(),
     date: elements.tradeDate.value,
@@ -1243,7 +1254,8 @@ elements.form.addEventListener("submit", async (event) => {
     profit: Number(elements.profit.value),
     rr: Number(elements.rr.value),
     note: elements.note.value.trim(),
-    createdAt: Date.now(),
+    createdAt: existingTrade ? existingTrade.createdAt : now,
+    updatedAt: now,
   };
 
   if (elements.tradeId.value) {
@@ -1371,4 +1383,3 @@ initializeAccessGate();
 resetForm();
 render();
 initializeRemoteStore();
-
