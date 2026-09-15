@@ -814,7 +814,9 @@ function updateSortIcon() {
 function updateFilters() {
   const currentMonth = elements.monthFilter.value;
   const currentPair = elements.pairFilter.value;
-  const months = [...new Set([currentMonthKey(), ...sortedTrades().map((trade) => monthKey(trade.date))])];
+  const months = [...new Set([currentMonthKey(), ...sortedTrades().map((trade) => monthKey(trade.date))])]
+    .filter(Boolean)
+    .sort((a, b) => b.localeCompare(a));
   const pairs = [...new Set(sortedTrades().map((trade) => trade.pair))];
 
   elements.monthFilter.innerHTML = `<option value="all">Tất cả</option>`;
