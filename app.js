@@ -353,6 +353,8 @@ const elements = {
   accessForm: document.querySelector("#accessForm"),
   accessPassword: document.querySelector("#accessPassword"),
   accessError: document.querySelector("#accessError"),
+  methodGuideDialog: document.querySelector("#methodGuideDialog"),
+  openMethodGuide: document.querySelector("#openMethodGuide"),
   form: document.querySelector("#tradeForm"),
   formTitle: document.querySelector("#formTitle"),
   tradeId: document.querySelector("#tradeId"),
@@ -475,6 +477,13 @@ function unlockAccess() {
   sessionStorage.setItem(ACCESS_UNLOCK_KEY, "true");
   elements.accessPassword.value = "";
   elements.accessError.textContent = "";
+  showMethodGuide();
+}
+
+function showMethodGuide() {
+  if (!elements.methodGuideDialog.open) {
+    elements.methodGuideDialog.showModal();
+  }
 }
 
 function initializeAccessGate() {
@@ -1381,6 +1390,7 @@ elements.form.addEventListener("submit", async (event) => {
 });
 
 elements.resetForm.addEventListener("click", resetForm);
+elements.openMethodGuide.addEventListener("click", showMethodGuide);
 elements.profit.addEventListener("input", syncDerivedFields);
 elements.rr.addEventListener("input", () => {
   elements.rr.dataset.manual = "true";

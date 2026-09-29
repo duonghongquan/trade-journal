@@ -8,7 +8,7 @@
       name="description"
       content="Web riêng tư để thống kê lệnh trade, theo dõi winrate, lợi nhuận và biểu đồ tăng trưởng."
     />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260929-method-guide" />
   </head>
   <body class="access-locked">
     <section class="access-gate" id="accessGate" aria-label="Mở khóa dashboard">
@@ -57,7 +57,10 @@
           <div>
             <h2 id="formTitle">Nhập lệnh trade</h2>
           </div>
-          <button class="ghost-button" type="button" id="resetForm">Làm mới</button>
+          <div class="form-actions">
+            <button class="ghost-button" type="button" id="openMethodGuide">Xem phương pháp</button>
+            <button class="ghost-button" type="button" id="resetForm">Làm mới</button>
+          </div>
         </div>
 
         <div class="trade-settings">
@@ -214,6 +217,49 @@
       </section>
     </main>
 
-    <script src="./app.js?v=20260929-methods"></script>
+    <dialog class="method-guide-dialog" id="methodGuideDialog" aria-labelledby="methodGuideTitle">
+      <div class="method-guide-head">
+        <div>
+          <p class="eyebrow">Kế hoạch trước khi vào lệnh</p>
+          <h2 id="methodGuideTitle">Phương pháp giao dịch</h2>
+        </div>
+        <form method="dialog">
+          <button class="dialog-close" type="submit" aria-label="Đóng">×</button>
+        </form>
+      </div>
+
+      <div class="method-guide-content">
+        <section>
+          <h3>Đánh hồi</h3>
+          <ul>
+            <li>Tạo 2 đỉnh, 2 đáy ở khung M15.</li>
+            <li>Các khung lớn hơn: giá cách xa EMA, RSI phân kỳ.</li>
+            <li>Tạo cấu trúc Dow ở khung vào lệnh.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h3>Đánh thuận</h3>
+          <ul>
+            <li>Xác định biên khung M15.</li>
+            <li>Chờ phá biên, đồng thời tạo cấu trúc Dow ở khung M5.</li>
+          </ul>
+          <p class="method-priority">Ưu tiên thuận xu hướng.</p>
+        </section>
+
+        <section>
+          <h3>Đánh SW</h3>
+          <ul>
+            <li>Giao dịch trong biên cản đã chạm 2 lần và bật ra.</li>
+          </ul>
+        </section>
+      </div>
+
+      <form method="dialog" class="method-guide-footer">
+        <button class="primary-button" type="submit">Đã đọc</button>
+      </form>
+    </dialog>
+
+    <script src="./app.js?v=20260929-method-guide"></script>
   </body>
 </html>
