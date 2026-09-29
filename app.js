@@ -1,5 +1,6 @@
 const STORAGE_KEY = "private-trade-journal-v1";
 const RR_RULES_KEY = "private-trade-journal-rr-rules-v1";
+const METHODS_KEY = "private-trade-journal-methods-v1";
 const DATASET_VERSION_KEY = "private-trade-journal-dataset-version-v1";
 const CURRENT_DATASET_VERSION = "20260902-sheet-images-v2";
 const DELETED_TRADE_IDS_KEY = "private-trade-journal-deleted-ids-v1";
@@ -322,6 +323,7 @@ const sheetImageTrades = [
 const state = {
   trades: loadTrades(),
   rrRules: activeRrRules,
+  methods: loadMethods(),
   deletedTradeIds: loadDeletedTradeIds(),
   forceRemoteReplace: SHOULD_RESET_TO_SHEET_IMAGES,
   chartMode: "profit",
@@ -360,6 +362,9 @@ const elements = {
   result: document.querySelector("#result"),
   profit: document.querySelector("#profit"),
   rr: document.querySelector("#rr"),
+  method: document.querySelector("#method"),
+  newMethod: document.querySelector("#newMethod"),
+  addMethod: document.querySelector("#addMethod"),
   oneRValue: document.querySelector("#oneRValue"),
   saveOneRRule: document.querySelector("#saveOneRRule"),
   note: document.querySelector("#note"),
@@ -377,6 +382,7 @@ const elements = {
   monthFilter: document.querySelector("#monthFilter"),
   pairFilter: document.querySelector("#pairFilter"),
   noteFilter: document.querySelector("#noteFilter"),
+  methodFilter: document.querySelector("#methodFilter"),
   monthSortToggle: document.querySelector("#monthSortToggle"),
   monthSortIcon: document.querySelector("#monthSortIcon"),
   filterSummary: document.querySelector("#filterSummary"),
@@ -405,6 +411,44 @@ function loadTrades() {
 
 function saveTrades() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.trades));
+}
+
+function loadMethods() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(METHODS_KEY) || "[]");
+    return normalizeMethods(parsed);
+  } catch {
+    return [];
+  }
+}
+
+function normalizeMethods(methods) {
+  return [...new Set((Array.isArray(methods) ? methods : []).map((method) => String(method || "").trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "vi"));
+}
+
+function saveMethods() {
+  localStorage.setItem(METHODS_KEY, JSON.stringify(state.methods));
+}
+
+async function addMethod() {
+  const method = elements.newMethod.value.trim();
+  if (!method) {
+    elements.newMethod.focus();
+    return;
+  }
+
+  const existing = state.methods.find((item) => item.localeCompare(method, "vi", { sensitivity: "base" }) === 0);
+  if (!existing) {
+    state.methods = normalizeMethods([...state.methods, method]);
+    saveMethods();
+    await sendRemoteAction("saveMethods", { methods: state.methods });
+  }
+
+  elements.newMethod.value = "";
+  updateMethodOptions(existing || method);
+  render();
+  elements.method.focus();
 }
 
 function loadDeletedTradeIds() {
@@ -502,6 +546,7 @@ async function initializeRemoteStore() {
   if (state.forceRemoteReplace) {
     await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
     await sendRemoteAction("saveRrRules", { rrRules: state.rrRules });
+    await sendRemoteAction("saveMethods", { methods: state.methods });
     localStorage.setItem(REMOTE_LEGACY_RR_MIGRATION_KEY, "true");
     state.forceRemoteReplace = false;
     return;
@@ -517,12 +562,14 @@ async function initializeRemoteStore() {
     saveTrades();
     render();
     await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
+    await sendRemoteAction("saveMethods", { methods: state.methods });
     localStorage.setItem(REMOTE_LEGACY_RR_MIGRATION_KEY, "true");
     return;
   }
 
   await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
   await sendRemoteAction("saveRrRules", { rrRules: state.rrRules });
+  await sendRemoteAction("saveMethods", { methods: state.methods });
   localStorage.setItem(REMOTE_LEGACY_RR_MIGRATION_KEY, "true");
 }
 
@@ -563,6 +610,7 @@ function loadRemoteTradesJsonp() {
 }
 
 function applyRemoteRrRules(data) {
+  applyRemoteMethods(data);
   if (!data || !Array.isArray(data.rrRules)) return;
 
   state.rrRules = normalizeRrRules(data.rrRules);
@@ -571,6 +619,13 @@ function applyRemoteRrRules(data) {
   if (elements && elements.oneRValue) {
     updateRrRuleInputs();
   }
+}
+
+function applyRemoteMethods(data) {
+  if (!data || !Array.isArray(data.methods)) return;
+  state.methods = normalizeMethods([...state.methods, ...data.methods]);
+  saveMethods();
+  if (elements && elements.method) updateFilters();
 }
 
 async function sendRemoteAction(action, payload) {
@@ -602,6 +657,7 @@ function remoteTradePayload(trade) {
     profit: Number(trade.profit),
     rr: Number(trade.rr),
     note: trade.note || "",
+    method: trade.method || "",
     createdAt: tradeModifiedAt(trade) || Date.now(),
     updatedAt: tradeModifiedAt(trade) || Date.now(),
   };
@@ -644,6 +700,7 @@ function normalizeTrades(trades) {
     date: normalizeDateValue(trade.date),
     result: profitToResult(trade.profit),
     rr: normalizeRValue(trade),
+    method: String(trade.method || "").trim(),
     createdAt: Number(trade.createdAt) || Date.now(),
     updatedAt: Number(trade.updatedAt) || Number(trade.createdAt) || Date.now(),
   }));
@@ -768,6 +825,7 @@ function filteredTrades() {
   const selectedMonth = elements.monthFilter.value;
   const selectedPair = elements.pairFilter.value;
   const selectedNote = elements.noteFilter.value;
+  const selectedMethod = elements.methodFilter.value;
 
   return sortedTrades().filter((trade) => {
     const monthMatch = selectedMonth === "all" || monthKey(trade.date) === selectedMonth;
@@ -777,7 +835,8 @@ function filteredTrades() {
       selectedNote === "all" ||
       (selectedNote === "with" && hasNote) ||
       (selectedNote === "without" && !hasNote);
-    return monthMatch && pairMatch && noteMatch;
+    const methodMatch = selectedMethod === "all" || (trade.method || "") === selectedMethod;
+    return monthMatch && pairMatch && noteMatch && methodMatch;
   });
 }
 
@@ -811,13 +870,27 @@ function updateSortIcon() {
     state.sortOrder === "oldest" ? "Đang sắp xếp từ đầu tháng" : "Đang sắp xếp từ cuối tháng";
 }
 
+function updateMethodOptions(selectedMethod = elements.method.value) {
+  const methods = normalizeMethods([...state.methods, ...state.trades.map((trade) => trade.method)]);
+  elements.method.innerHTML = '<option value="">Chưa chọn</option>';
+  methods.forEach((method) => {
+    const option = document.createElement("option");
+    option.value = method;
+    option.textContent = method;
+    elements.method.appendChild(option);
+  });
+  elements.method.value = methods.includes(selectedMethod) ? selectedMethod : "";
+}
+
 function updateFilters() {
   const currentMonth = elements.monthFilter.value;
   const currentPair = elements.pairFilter.value;
+  const currentMethod = elements.methodFilter.value;
   const months = [...new Set([currentMonthKey(), ...sortedTrades().map((trade) => monthKey(trade.date))])]
     .filter(Boolean)
     .sort((a, b) => b.localeCompare(a));
   const pairs = [...new Set(sortedTrades().map((trade) => trade.pair))];
+  const methods = normalizeMethods([...state.methods, ...state.trades.map((trade) => trade.method)]);
 
   elements.monthFilter.innerHTML = `<option value="all">Tất cả</option>`;
   months.forEach((month) => {
@@ -835,6 +908,15 @@ function updateFilters() {
     elements.pairFilter.appendChild(option);
   });
 
+  elements.methodFilter.innerHTML = '<option value="all">Tất cả</option>';
+  methods.forEach((method) => {
+    const option = document.createElement("option");
+    option.value = method;
+    option.textContent = method;
+    elements.methodFilter.appendChild(option);
+  });
+  updateMethodOptions();
+
   if (!state.monthFilterInitialized) {
     elements.monthFilter.value = currentMonthKey();
     state.monthFilterInitialized = true;
@@ -842,13 +924,14 @@ function updateFilters() {
     elements.monthFilter.value = months.includes(currentMonth) ? currentMonth : "all";
   }
   elements.pairFilter.value = pairs.includes(currentPair) ? currentPair : "all";
+  elements.methodFilter.value = methods.includes(currentMethod) ? currentMethod : "all";
 }
 
 function renderRows(trades) {
   elements.tradeRows.innerHTML = "";
 
   if (!trades.length) {
-    elements.tradeRows.innerHTML = `<tr><td class="empty-state" colspan="9">Chưa có lệnh phù hợp với bộ lọc.</td></tr>`;
+    elements.tradeRows.innerHTML = `<tr><td class="empty-state" colspan="10">Chưa có lệnh phù hợp với bộ lọc.</td></tr>`;
     return;
   }
 
@@ -864,6 +947,7 @@ function renderRows(trades) {
       <td><span class="tag ${trade.result.toLowerCase()}">${trade.result}</span></td>
       <td class="${profitClass}">${money(Number(trade.profit))}</td>
       <td class="${rrClass}">${formatR(Number(trade.rr))}</td>
+      <td>${escapeHtml(trade.method || "—")}</td>
       <td>${escapeHtml(trade.note || "")}</td>
       <td>
         <div class="row-actions">
@@ -884,7 +968,7 @@ function exportTradesToExcel() {
   }
 
   const rows = [
-    ["STT", "Ngày", "Cặp", "Long/Short", "Win/Loss", "Profit", "R:R", "Ghi chú"],
+    ["STT", "Ngày", "Cặp", "Long/Short", "Win/Loss", "Profit", "R:R", "Phương pháp", "Ghi chú"],
     ...trades.map((trade, index) => [
       index + 1,
       monthLabel(trade.date),
@@ -893,12 +977,13 @@ function exportTradesToExcel() {
       trade.result,
       Number(trade.profit),
       formatR(tradeRValue(trade)),
+      trade.method || "",
       trade.note || "",
     ]),
   ];
   const totalProfit = trades.reduce((sum, trade) => sum + Number(trade.profit), 0);
   const totalR = trades.reduce((sum, trade) => sum + tradeRValue(trade), 0);
-  rows.push(["TỔNG", "", "", "", "", totalProfit, formatR(totalR), ""]);
+  rows.push(["TỔNG", "", "", "", "", totalProfit, formatR(totalR), "", ""]);
 
   const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
   const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
@@ -906,6 +991,7 @@ function exportTradesToExcel() {
   const link = document.createElement("a");
   const monthPart = elements.monthFilter.value === "all" ? "tat-ca" : elements.monthFilter.value;
   const pairPart = elements.pairFilter.value === "all" ? "tat-ca-cap" : elements.pairFilter.value.toLowerCase();
+  const methodPart = elements.methodFilter.value === "all" ? "tat-ca-phuong-phap" : slugify(elements.methodFilter.value);
   const notePart =
     elements.noteFilter.value === "with"
       ? "co-ghi-chu"
@@ -914,11 +1000,22 @@ function exportTradesToExcel() {
         : "tat-ca-ghi-chu";
 
   link.href = url;
-  link.download = `trade-journal-${monthPart}-${pairPart}-${notePart}.csv`;
+  link.download = `trade-journal-${monthPart}-${pairPart}-${methodPart}-${notePart}.csv`;
   document.body.appendChild(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function slugify(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 function csvCell(value) {
@@ -929,7 +1026,8 @@ function csvCell(value) {
 function backupTradeData() {
   const payload = {
     exportedAt: new Date().toISOString(),
-    version: 1,
+    version: 2,
+    methods: state.methods,
     trades: sortedTrades(state.trades),
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
@@ -953,8 +1051,11 @@ function importTradeData(file) {
       if (!Array.isArray(importedTrades)) throw new Error("Invalid backup");
 
       state.trades = mergeTradesById(state.trades, importedTrades);
+      state.methods = normalizeMethods([...state.methods, ...(Array.isArray(payload.methods) ? payload.methods : [])]);
       saveTrades();
+      saveMethods();
       await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
+      await sendRemoteAction("saveMethods", { methods: state.methods });
       render();
       alert("Đã nhập dữ liệu thành công.");
     } catch {
@@ -1169,6 +1270,7 @@ function resetForm() {
   elements.result.value = "LOSS";
   elements.rr.value = "";
   elements.rr.dataset.manual = "false";
+  updateMethodOptions("");
   elements.formTitle.textContent = "Nhập lệnh trade";
   elements.submitTrade.textContent = "Lưu lệnh";
   updateRrRuleInputs();
@@ -1221,13 +1323,14 @@ function render() {
 
   const monthText = elements.monthFilter.value === "all" ? "tất cả tháng" : `tháng ${elements.monthFilter.value}`;
   const pairText = elements.pairFilter.value === "all" ? "tất cả cặp" : elements.pairFilter.value;
+  const methodText = elements.methodFilter.value === "all" ? "tất cả phương pháp" : elements.methodFilter.value;
   const noteText =
     elements.noteFilter.value === "with"
       ? "có ghi chú"
       : elements.noteFilter.value === "without"
         ? "không ghi chú"
         : "tất cả ghi chú";
-  elements.filterSummary.textContent = `Đang hiển thị ${trades.length} lệnh: ${monthText}, ${pairText}, ${noteText}.`;
+  elements.filterSummary.textContent = `Đang hiển thị ${trades.length} lệnh: ${monthText}, ${pairText}, ${methodText}, ${noteText}.`;
 }
 
 elements.accessForm.addEventListener("submit", (event) => {
@@ -1255,6 +1358,7 @@ elements.form.addEventListener("submit", async (event) => {
     result: profitToResult(elements.profit.value),
     profit: Number(elements.profit.value),
     rr: Number(elements.rr.value),
+    method: elements.method.value,
     note: elements.note.value.trim(),
     createdAt: existingTrade ? existingTrade.createdAt : now,
     updatedAt: now,
@@ -1286,9 +1390,16 @@ elements.tradeDate.addEventListener("change", () => {
   suggestRrFromCurrentFields(false);
 });
 elements.saveOneRRule.addEventListener("click", saveOneRRule);
+elements.addMethod.addEventListener("click", addMethod);
+elements.newMethod.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  addMethod();
+});
 elements.monthFilter.addEventListener("change", render);
 elements.pairFilter.addEventListener("change", render);
 elements.noteFilter.addEventListener("change", render);
+elements.methodFilter.addEventListener("change", render);
 elements.monthSortToggle.addEventListener("click", () => {
   state.sortOrder = state.sortOrder === "oldest" ? "newest" : "oldest";
   render();
@@ -1362,6 +1473,7 @@ elements.tradeRows.addEventListener("click", async (event) => {
   elements.profit.value = trade.profit;
   elements.rr.value = trade.rr;
   elements.rr.dataset.manual = "true";
+  updateMethodOptions(trade.method || "");
   elements.note.value = trade.note;
   elements.formTitle.textContent = "Sửa lệnh trade";
   elements.submitTrade.textContent = "Cập nhật lệnh";

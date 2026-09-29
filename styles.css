@@ -239,7 +239,7 @@ label {
 }
 
 .compact-form {
-  grid-template-columns: 240px 1.2fr 0.9fr 1fr 1fr 0.9fr 0.9fr 1.8fr auto;
+  grid-template-columns: 1.2fr 0.8fr 0.9fr 0.9fr 0.9fr 0.8fr 1.2fr 1.8fr auto;
   align-items: end;
 }
 
@@ -247,7 +247,15 @@ label {
   grid-column: 1 / -1;
 }
 
-.rr-settings {
+.trade-settings {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 18px;
+  align-items: end;
+}
+
+.rr-settings,
+.method-settings {
   display: flex;
   gap: 8px;
   align-items: end;
@@ -259,6 +267,10 @@ label {
 
 .rr-settings .ghost-button {
   white-space: nowrap;
+}
+
+.method-settings label {
+  width: min(280px, 38vw);
 }
 
 .compact-form .note-field {
@@ -561,13 +573,17 @@ td:nth-child(7) {
     grid-template-columns: 1fr;
   }
 
-  .rr-settings {
+  .trade-settings,
+  .rr-settings,
+  .method-settings {
     display: grid;
     grid-template-columns: 1fr;
   }
 
   .rr-settings label,
-  .rr-settings .ghost-button {
+  .rr-settings .ghost-button,
+  .method-settings label,
+  .method-settings .ghost-button {
     width: 100%;
   }
 

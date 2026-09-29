@@ -1,6 +1,6 @@
 const SHEET_NAME = "trades";
 const SETTINGS_SHEET_NAME = "settings";
-const HEADERS = ["id", "date", "pair", "direction", "result", "profit", "rr", "note", "createdAt", "updatedAt"];
+const HEADERS = ["id", "date", "pair", "direction", "result", "profit", "rr", "note", "createdAt", "updatedAt", "method"];
 const DEFAULT_RR_RULES = [
   { startDate: "2026-01-01", value: 5 },
   { startDate: "2026-06-19", value: 10 },
@@ -23,9 +23,10 @@ function doGet(e) {
       note: row[7] || "",
       createdAt: Number(row[8]) || Date.now(),
       updatedAt: Number(row[9]) || Number(row[8]) || Date.now(),
+      method: row[10] || "",
     }));
 
-  return json({ ok: true, trades, rrRules: getRrRules() }, e);
+  return json({ ok: true, trades, rrRules: getRrRules(), methods: getMethods() }, e);
 }
 
 function doPost(e) {
@@ -46,6 +47,10 @@ function doPost(e) {
 
   if (payload.action === "saveRrRules") {
     saveRrRules(payload.rrRules || []);
+  }
+
+  if (payload.action === "saveMethods") {
+    saveMethods(payload.methods || []);
   }
 
   return json({ ok: true }, e);
@@ -77,6 +82,36 @@ function getRrRules() {
   }
 }
 
+function getMethods() {
+  const sheet = getSettingsSheet();
+  const values = sheet.getDataRange().getValues();
+  const row = values.find((item) => item[0] === "methods");
+
+  if (!row || !row[1]) return [];
+
+  try {
+    const parsed = JSON.parse(row[1]);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMethods(methods) {
+  const sheet = getSettingsSheet();
+  const normalized = [...new Set((Array.isArray(methods) ? methods : []).map((method) => String(method || "").trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+  const values = sheet.getDataRange().getValues();
+  const index = values.findIndex((item) => item[0] === "methods");
+  const row = ["methods", JSON.stringify(normalized)];
+
+  if (index >= 0) {
+    sheet.getRange(index + 1, 1, 1, 2).setValues([row]);
+  } else {
+    sheet.appendRow(row);
+  }
+}
+
 function saveRrRules(rules) {
   const sheet = getSettingsSheet();
   const normalizedRules = (Array.isArray(rules) && rules.length ? rules : DEFAULT_RR_RULES)
@@ -103,6 +138,8 @@ function getSheet() {
 
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(HEADERS);
+  } else if (sheet.getLastColumn() < HEADERS.length) {
+    sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
   }
 
   return sheet;
@@ -122,6 +159,7 @@ function upsertTrade(sheet, trade) {
     trade.note || "",
     Number(trade.createdAt) || Date.now(),
     Number(trade.updatedAt) || Number(trade.createdAt) || Date.now(),
+    trade.method || "",
   ];
   const ids = sheet.getRange(2, 1, Math.max(sheet.getLastRow() - 1, 1), 1).getValues().flat();
   const index = ids.findIndex((id) => String(id) === String(trade.id));
