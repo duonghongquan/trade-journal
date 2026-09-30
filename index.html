@@ -58,7 +58,7 @@
             <h2 id="formTitle">Nhập lệnh trade</h2>
           </div>
           <div class="form-actions">
-            <button class="ghost-button" type="button" id="openMethodGuide">Xem phương pháp</button>
+            <button class="ghost-button" type="button" id="openMethodGuide">Xem quy tắc</button>
             <button class="ghost-button" type="button" id="resetForm">Làm mới</button>
           </div>
         </div>
@@ -221,45 +221,64 @@
       <div class="method-guide-head">
         <div>
           <p class="eyebrow">Kế hoạch trước khi vào lệnh</p>
-          <h2 id="methodGuideTitle">Phương pháp giao dịch</h2>
+          <h2 id="methodGuideTitle">Quy tắc giao dịch</h2>
         </div>
-        <form method="dialog">
-          <button class="dialog-close" type="submit" aria-label="Đóng">×</button>
-        </form>
+        <div class="method-guide-head-actions">
+          <button class="ghost-button" type="button" id="editTradeRules">Chỉnh sửa</button>
+          <form method="dialog">
+            <button class="dialog-close" type="submit" aria-label="Đóng">×</button>
+          </form>
+        </div>
       </div>
 
-      <div class="method-guide-content">
+      <div class="method-guide-content" id="methodGuideView">
         <section>
           <h3>Đánh hồi</h3>
-          <ul>
-            <li>Tạo 2 đỉnh, 2 đáy ở khung M15.</li>
-            <li>Các khung lớn hơn: giá cách xa EMA, RSI phân kỳ.</li>
-            <li>Tạo cấu trúc Dow ở khung vào lệnh.</li>
-          </ul>
+          <ul id="reversalRulesList"></ul>
         </section>
 
         <section>
           <h3>Đánh thuận</h3>
-          <ul>
-            <li>Xác định biên khung M15.</li>
-            <li>Chờ phá biên, đồng thời tạo cấu trúc Dow ở khung M5.</li>
-          </ul>
-          <p class="method-priority">Ưu tiên thuận xu hướng.</p>
+          <ul id="trendRulesList"></ul>
+          <p class="method-priority" id="trendPriorityText"></p>
         </section>
 
         <section>
           <h3>Đánh SW</h3>
-          <ul>
-            <li>Giao dịch trong biên cản đã chạm 2 lần và bật ra.</li>
-          </ul>
+          <ul id="rangeRulesList"></ul>
         </section>
       </div>
 
-      <form method="dialog" class="method-guide-footer">
+      <div class="method-guide-editor" id="methodGuideEditor" hidden>
+        <div class="rule-editor-fields">
+          <label>
+            Đánh hồi
+            <textarea id="reversalRulesInput" rows="5" placeholder="Mỗi dòng là một quy tắc"></textarea>
+          </label>
+          <label>
+            Đánh thuận
+            <textarea id="trendRulesInput" rows="4" placeholder="Mỗi dòng là một quy tắc"></textarea>
+          </label>
+          <label>
+            Câu ưu tiên
+            <input id="trendPriorityInput" type="text" maxlength="160" />
+          </label>
+          <label>
+            Đánh SW
+            <textarea id="rangeRulesInput" rows="3" placeholder="Mỗi dòng là một quy tắc"></textarea>
+          </label>
+        </div>
+        <div class="rule-editor-actions">
+          <button class="ghost-button" type="button" id="cancelTradeRules">Hủy</button>
+          <button class="primary-button" type="button" id="saveTradeRules">Lưu quy tắc</button>
+        </div>
+      </div>
+
+      <form method="dialog" class="method-guide-footer" id="methodGuideFooter">
         <button class="primary-button" type="submit">Đã đọc</button>
       </form>
     </dialog>
 
-    <script src="./app.js?v=20260930-sheet-methods"></script>
+    <script src="./app.js?v=20260930-editable-rules"></script>
   </body>
 </html>

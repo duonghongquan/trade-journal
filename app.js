@@ -1,6 +1,7 @@
 const STORAGE_KEY = "private-trade-journal-v1";
 const RR_RULES_KEY = "private-trade-journal-rr-rules-v1";
 const METHODS_KEY = "private-trade-journal-methods-v1";
+const TRADE_RULES_KEY = "private-trade-journal-trade-rules-v1";
 const DATASET_VERSION_KEY = "private-trade-journal-dataset-version-v1";
 const CURRENT_DATASET_VERSION = "20260902-sheet-images-v2";
 const DELETED_TRADE_IDS_KEY = "private-trade-journal-deleted-ids-v1";
@@ -19,6 +20,20 @@ const DEFAULT_RR_RULES = [
   { startDate: "2026-01-01", value: LEGACY_ONE_R_VALUE },
   { startDate: "2026-06-19", value: ONE_R_VALUE },
 ];
+const DEFAULT_TRADE_RULES = {
+  reversal: [
+    "Tạo 2 đỉnh, 2 đáy ở khung M15.",
+    "Các khung lớn hơn: giá cách xa EMA, RSI phân kỳ.",
+    "Tạo cấu trúc Dow ở khung vào lệnh.",
+  ],
+  trend: [
+    "Xác định biên khung M15.",
+    "Chờ phá biên, đồng thời tạo cấu trúc Dow ở khung M5.",
+  ],
+  trendPriority: "Ưu tiên thuận xu hướng.",
+  range: ["Giao dịch trong biên cản đã chạm 2 lần và bật ra."],
+  updatedAt: 0,
+};
 let activeRrRules = loadRrRules();
 const HAD_LOCAL_TRADES = localStorage.getItem(STORAGE_KEY) !== null;
 const SHOULD_RESET_TO_SHEET_IMAGES = HAD_LOCAL_TRADES && localStorage.getItem(DATASET_VERSION_KEY) !== CURRENT_DATASET_VERSION;
@@ -324,6 +339,7 @@ const state = {
   trades: loadTrades(),
   rrRules: activeRrRules,
   methods: loadMethods(),
+  tradeRules: loadTradeRules(),
   deletedTradeIds: loadDeletedTradeIds(),
   forceRemoteReplace: SHOULD_RESET_TO_SHEET_IMAGES,
   chartMode: "profit",
@@ -355,6 +371,20 @@ const elements = {
   accessError: document.querySelector("#accessError"),
   methodGuideDialog: document.querySelector("#methodGuideDialog"),
   openMethodGuide: document.querySelector("#openMethodGuide"),
+  methodGuideView: document.querySelector("#methodGuideView"),
+  methodGuideEditor: document.querySelector("#methodGuideEditor"),
+  methodGuideFooter: document.querySelector("#methodGuideFooter"),
+  editTradeRules: document.querySelector("#editTradeRules"),
+  reversalRulesList: document.querySelector("#reversalRulesList"),
+  trendRulesList: document.querySelector("#trendRulesList"),
+  rangeRulesList: document.querySelector("#rangeRulesList"),
+  trendPriorityText: document.querySelector("#trendPriorityText"),
+  reversalRulesInput: document.querySelector("#reversalRulesInput"),
+  trendRulesInput: document.querySelector("#trendRulesInput"),
+  trendPriorityInput: document.querySelector("#trendPriorityInput"),
+  rangeRulesInput: document.querySelector("#rangeRulesInput"),
+  cancelTradeRules: document.querySelector("#cancelTradeRules"),
+  saveTradeRules: document.querySelector("#saveTradeRules"),
   form: document.querySelector("#tradeForm"),
   formTitle: document.querySelector("#formTitle"),
   tradeId: document.querySelector("#tradeId"),
@@ -433,6 +463,87 @@ function saveMethods() {
   localStorage.setItem(METHODS_KEY, JSON.stringify(state.methods));
 }
 
+function normalizeRuleLines(lines, fallback = []) {
+  const source = Array.isArray(lines) ? lines : fallback;
+  return source.map((line) => String(line || "").trim()).filter(Boolean);
+}
+
+function normalizeTradeRules(rules) {
+  const source = rules && typeof rules === "object" ? rules : {};
+  return {
+    reversal: normalizeRuleLines(source.reversal, DEFAULT_TRADE_RULES.reversal),
+    trend: normalizeRuleLines(source.trend, DEFAULT_TRADE_RULES.trend),
+    trendPriority: String(source.trendPriority ?? DEFAULT_TRADE_RULES.trendPriority).trim(),
+    range: normalizeRuleLines(source.range, DEFAULT_TRADE_RULES.range),
+    updatedAt: Number(source.updatedAt) || 0,
+  };
+}
+
+function loadTradeRules() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(TRADE_RULES_KEY) || "null");
+    return normalizeTradeRules(parsed);
+  } catch {
+    return normalizeTradeRules(DEFAULT_TRADE_RULES);
+  }
+}
+
+function saveTradeRulesLocally() {
+  localStorage.setItem(TRADE_RULES_KEY, JSON.stringify(state.tradeRules));
+}
+
+function renderRuleList(element, rules) {
+  element.innerHTML = "";
+  const items = rules.length ? rules : ["Chưa có quy tắc."];
+  items.forEach((rule) => {
+    const item = document.createElement("li");
+    item.textContent = rule;
+    element.appendChild(item);
+  });
+}
+
+function renderTradeRules() {
+  renderRuleList(elements.reversalRulesList, state.tradeRules.reversal);
+  renderRuleList(elements.trendRulesList, state.tradeRules.trend);
+  renderRuleList(elements.rangeRulesList, state.tradeRules.range);
+  elements.trendPriorityText.textContent = state.tradeRules.trendPriority;
+  elements.trendPriorityText.hidden = !state.tradeRules.trendPriority;
+}
+
+function setTradeRulesEditing(editing) {
+  elements.methodGuideView.hidden = editing;
+  elements.methodGuideEditor.hidden = !editing;
+  elements.methodGuideFooter.hidden = editing;
+  elements.editTradeRules.hidden = editing;
+}
+
+function openTradeRulesEditor() {
+  elements.reversalRulesInput.value = state.tradeRules.reversal.join("\n");
+  elements.trendRulesInput.value = state.tradeRules.trend.join("\n");
+  elements.trendPriorityInput.value = state.tradeRules.trendPriority;
+  elements.rangeRulesInput.value = state.tradeRules.range.join("\n");
+  setTradeRulesEditing(true);
+  elements.reversalRulesInput.focus();
+}
+
+function cancelTradeRulesEdit() {
+  setTradeRulesEditing(false);
+}
+
+async function saveTradeRulesFromEditor() {
+  state.tradeRules = normalizeTradeRules({
+    reversal: elements.reversalRulesInput.value.split(/\r?\n/),
+    trend: elements.trendRulesInput.value.split(/\r?\n/),
+    trendPriority: elements.trendPriorityInput.value,
+    range: elements.rangeRulesInput.value.split(/\r?\n/),
+    updatedAt: Date.now(),
+  });
+  saveTradeRulesLocally();
+  renderTradeRules();
+  setTradeRulesEditing(false);
+  await sendRemoteAction("saveTradeRules", { tradeRules: state.tradeRules });
+}
+
 async function addMethod() {
   const method = elements.newMethod.value.trim();
   if (!method) {
@@ -481,6 +592,8 @@ function unlockAccess() {
 }
 
 function showMethodGuide() {
+  renderTradeRules();
+  setTradeRulesEditing(false);
   if (!elements.methodGuideDialog.open) {
     elements.methodGuideDialog.showModal();
   }
@@ -556,6 +669,7 @@ async function initializeRemoteStore() {
     await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
     await sendRemoteAction("saveRrRules", { rrRules: state.rrRules });
     await sendRemoteAction("saveMethods", { methods: state.methods });
+    await sendRemoteAction("saveTradeRules", { tradeRules: state.tradeRules });
     localStorage.setItem(REMOTE_LEGACY_RR_MIGRATION_KEY, "true");
     state.forceRemoteReplace = false;
     return;
@@ -572,6 +686,7 @@ async function initializeRemoteStore() {
     render();
     await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
     await sendRemoteAction("saveMethods", { methods: state.methods });
+    await sendRemoteAction("saveTradeRules", { tradeRules: state.tradeRules });
     localStorage.setItem(REMOTE_LEGACY_RR_MIGRATION_KEY, "true");
     return;
   }
@@ -579,6 +694,7 @@ async function initializeRemoteStore() {
   await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
   await sendRemoteAction("saveRrRules", { rrRules: state.rrRules });
   await sendRemoteAction("saveMethods", { methods: state.methods });
+  await sendRemoteAction("saveTradeRules", { tradeRules: state.tradeRules });
   localStorage.setItem(REMOTE_LEGACY_RR_MIGRATION_KEY, "true");
 }
 
@@ -620,6 +736,7 @@ function loadRemoteTradesJsonp() {
 
 function applyRemoteRrRules(data) {
   applyRemoteMethods(data);
+  applyRemoteTradeRules(data);
   if (!data || !Array.isArray(data.rrRules)) return;
 
   state.rrRules = normalizeRrRules(data.rrRules);
@@ -627,6 +744,17 @@ function applyRemoteRrRules(data) {
   saveRrRules();
   if (elements && elements.oneRValue) {
     updateRrRuleInputs();
+  }
+}
+
+function applyRemoteTradeRules(data) {
+  if (!data || !data.tradeRules || typeof data.tradeRules !== "object") return;
+
+  const remoteRules = normalizeTradeRules(data.tradeRules);
+  if (remoteRules.updatedAt >= state.tradeRules.updatedAt) {
+    state.tradeRules = remoteRules;
+    saveTradeRulesLocally();
+    if (elements && elements.methodGuideDialog) renderTradeRules();
   }
 }
 
@@ -1035,8 +1163,9 @@ function csvCell(value) {
 function backupTradeData() {
   const payload = {
     exportedAt: new Date().toISOString(),
-    version: 2,
+    version: 3,
     methods: state.methods,
+    tradeRules: state.tradeRules,
     trades: sortedTrades(state.trades),
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
@@ -1061,10 +1190,15 @@ function importTradeData(file) {
 
       state.trades = mergeTradesById(state.trades, importedTrades);
       state.methods = normalizeMethods([...state.methods, ...(Array.isArray(payload.methods) ? payload.methods : [])]);
+      if (payload.tradeRules && typeof payload.tradeRules === "object") {
+        state.tradeRules = normalizeTradeRules(payload.tradeRules);
+      }
       saveTrades();
       saveMethods();
+      saveTradeRulesLocally();
       await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
       await sendRemoteAction("saveMethods", { methods: state.methods });
+      await sendRemoteAction("saveTradeRules", { tradeRules: state.tradeRules });
       render();
       alert("Đã nhập dữ liệu thành công.");
     } catch {
@@ -1391,6 +1525,10 @@ elements.form.addEventListener("submit", async (event) => {
 
 elements.resetForm.addEventListener("click", resetForm);
 elements.openMethodGuide.addEventListener("click", showMethodGuide);
+elements.editTradeRules.addEventListener("click", openTradeRulesEditor);
+elements.cancelTradeRules.addEventListener("click", cancelTradeRulesEdit);
+elements.saveTradeRules.addEventListener("click", saveTradeRulesFromEditor);
+elements.methodGuideDialog.addEventListener("close", cancelTradeRulesEdit);
 elements.profit.addEventListener("input", syncDerivedFields);
 elements.rr.addEventListener("input", () => {
   elements.rr.dataset.manual = "true";

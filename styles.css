@@ -147,6 +147,16 @@ body.access-locked .access-gate {
   margin-bottom: 0;
 }
 
+.method-guide-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.method-guide-head-actions form {
+  margin: 0;
+}
+
 .dialog-close {
   width: 36px;
   height: 36px;
@@ -207,6 +217,31 @@ body.access-locked .access-gate {
 
 .method-guide-footer .primary-button {
   min-width: 110px;
+}
+
+.method-guide-editor {
+  padding: 18px 20px 20px;
+}
+
+.rule-editor-fields {
+  display: grid;
+  gap: 14px;
+}
+
+.rule-editor-fields textarea {
+  min-height: 86px;
+  line-height: 1.45;
+}
+
+.rule-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.rule-editor-actions .primary-button {
+  min-width: 130px;
 }
 
 .topbar,
@@ -671,6 +706,29 @@ td:nth-child(7) {
   }
 
   .form-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .method-guide-head {
+    padding: 16px;
+  }
+
+  .method-guide-head-actions {
+    align-items: flex-end;
+  }
+
+  .method-guide-head-actions .ghost-button {
+    padding-inline: 10px;
+  }
+
+  .method-guide-content,
+  .method-guide-editor {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .rule-editor-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
   }

@@ -26,7 +26,7 @@ function doGet(e) {
       method: row[10] || "",
     }));
 
-  return json({ ok: true, trades, rrRules: getRrRules(), methods: getMethods() }, e);
+  return json({ ok: true, trades, rrRules: getRrRules(), methods: getMethods(), tradeRules: getTradeRules() }, e);
 }
 
 function doPost(e) {
@@ -51,6 +51,10 @@ function doPost(e) {
 
   if (payload.action === "saveMethods") {
     saveMethods(payload.methods || []);
+  }
+
+  if (payload.action === "saveTradeRules") {
+    saveTradeRules(payload.tradeRules);
   }
 
   return json({ ok: true }, e);
@@ -79,6 +83,36 @@ function getRrRules() {
     return Array.isArray(parsed) && parsed.length ? parsed : DEFAULT_RR_RULES;
   } catch {
     return DEFAULT_RR_RULES;
+  }
+}
+
+function getTradeRules() {
+  const sheet = getSettingsSheet();
+  const values = sheet.getDataRange().getValues();
+  const row = values.find((item) => item[0] === "tradeRules");
+
+  if (!row || !row[1]) return null;
+
+  try {
+    const parsed = JSON.parse(row[1]);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveTradeRules(tradeRules) {
+  if (!tradeRules || typeof tradeRules !== "object") return;
+
+  const sheet = getSettingsSheet();
+  const values = sheet.getDataRange().getValues();
+  const index = values.findIndex((item) => item[0] === "tradeRules");
+  const row = ["tradeRules", JSON.stringify(tradeRules)];
+
+  if (index >= 0) {
+    sheet.getRange(index + 1, 1, 1, 2).setValues([row]);
+  } else {
+    sheet.appendRow(row);
   }
 }
 
