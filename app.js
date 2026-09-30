@@ -7,7 +7,7 @@ const DELETED_TRADE_IDS_KEY = "private-trade-journal-deleted-ids-v1";
 const ACCESS_PASSWORD = "trade2026";
 const ACCESS_UNLOCK_KEY = "trade-journal-access-unlocked-v1";
 const REMOTE_DB_URL =
-  "https://script.google.com/macros/s/AKfycbzDQd69vlW_T4kcOQjnysea-SvltWCVCAP6yhzfWFWLfRp7A0JJ1BN2ZPyDIWGtCrms/exec";
+  "https://script.google.com/macros/s/AKfycbw99OEuhgE75GVGsYK0lzwrEVtp5kUWxRNlJxeaD2HfOrjM_arPGnhKZ9uVGehz2P2F/exec";
 const HISTORICAL_IMPORT_KEY = "private-trade-journal-btc-history-v1-imported";
 const ALL_HISTORY_IMPORT_KEY = "private-trade-journal-all-history-v2-imported";
 const LOCAL_LEGACY_RR_MIGRATION_KEY = "private-trade-journal-legacy-5usd-rr-local-v1";
