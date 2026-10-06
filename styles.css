@@ -259,6 +259,16 @@ body.access-locked .access-gate {
   gap: 8px;
 }
 
+.sync-status {
+  margin: 4px 0 0;
+  color: var(--green-dark);
+  font-size: 12px;
+}
+
+.sync-status.sync-warning {
+  color: #f2c14e;
+}
+
 .topbar {
   align-items: center;
   margin-bottom: 14px;

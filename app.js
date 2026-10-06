@@ -5,6 +5,7 @@ const TRADE_RULES_KEY = "private-trade-journal-trade-rules-v1";
 const DATASET_VERSION_KEY = "private-trade-journal-dataset-version-v1";
 const CURRENT_DATASET_VERSION = "20260902-sheet-images-v2";
 const DELETED_TRADE_IDS_KEY = "private-trade-journal-deleted-ids-v1";
+const PENDING_SYNC_KEY = "private-trade-journal-pending-sync-v1";
 const ACCESS_PASSWORD = "trade2026";
 const ACCESS_UNLOCK_KEY = "trade-journal-access-unlocked-v1";
 const REMOTE_DB_URL =
@@ -341,21 +342,14 @@ const state = {
   methods: loadMethods(),
   tradeRules: loadTradeRules(),
   deletedTradeIds: loadDeletedTradeIds(),
-  forceRemoteReplace: SHOULD_RESET_TO_SHEET_IMAGES,
+  pendingSync: loadPendingSync(),
+  syncInProgress: false,
   chartMode: "profit",
   sortOrder: "newest",
   monthFilterInitialized: false,
   chartPoints: [],
   activeChartIndex: null,
 };
-
-if (SHOULD_RESET_TO_SHEET_IMAGES) {
-  state.trades = normalizeTrades(sheetImageTrades);
-  state.deletedTradeIds.clear();
-  saveDeletedTradeIds();
-  saveTrades();
-  localStorage.setItem(DATASET_VERSION_KEY, CURRENT_DATASET_VERSION);
-}
 
 if (localStorage.getItem(LOCAL_LEGACY_RR_MIGRATION_KEY) !== "true") {
   state.trades = applyLegacyRrRule(state.trades);
@@ -401,6 +395,7 @@ const elements = {
   saveOneRRule: document.querySelector("#saveOneRRule"),
   note: document.querySelector("#note"),
   submitTrade: document.querySelector("#submitTrade"),
+  syncStatus: document.querySelector("#syncStatus"),
   resetForm: document.querySelector("#resetForm"),
   totalProfit: document.querySelector("#totalProfit"),
   winrate: document.querySelector("#winrate"),
@@ -583,6 +578,54 @@ function rememberDeletedTrade(id) {
   saveDeletedTradeIds();
 }
 
+function loadPendingSync() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.filter((operation) => operation && operation.id && operation.type) : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePendingSync() {
+  localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(state.pendingSync));
+  updateSyncStatus();
+}
+
+function queueSyncOperation(operation) {
+  state.pendingSync = state.pendingSync.filter((item) => item.id !== operation.id);
+  state.pendingSync.push(operation);
+  savePendingSync();
+}
+
+function queueTradeUpsert(trade) {
+  queueSyncOperation({ type: "upsert", id: trade.id, trade: remoteTradePayload(trade), queuedAt: Date.now() });
+}
+
+function queueTradeDelete(trade) {
+  const deletedAt = Date.now();
+  queueSyncOperation({
+    type: "delete",
+    id: trade.id,
+    updatedAt: Math.max(deletedAt, tradeModifiedAt(trade) + 1),
+    queuedAt: deletedAt,
+  });
+}
+
+function updateSyncStatus(message = "") {
+  if (!elements || !elements.syncStatus) return;
+  const pendingCount = state.pendingSync.length;
+  elements.syncStatus.classList.toggle("sync-warning", pendingCount > 0);
+  if (message) elements.syncStatus.textContent = message;
+  else if (state.syncInProgress) elements.syncStatus.textContent = "Đang đồng bộ với Google Sheet...";
+  else if (pendingCount > 0) elements.syncStatus.textContent = `${pendingCount} thay đổi đang chờ đồng bộ.`;
+  else elements.syncStatus.textContent = "Đã đồng bộ với Google Sheet.";
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
 function unlockAccess() {
   document.body.classList.remove("access-locked");
   sessionStorage.setItem(ACCESS_UNLOCK_KEY, "true");
@@ -663,73 +706,85 @@ async function saveOneRRule() {
 }
 
 async function initializeRemoteStore() {
-  const remoteTrades = await loadRemoteTrades();
-
-  if (state.forceRemoteReplace) {
-    await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
-    await sendRemoteAction("saveRrRules", { rrRules: state.rrRules });
-    await sendRemoteAction("saveMethods", { methods: state.methods });
-    await sendRemoteAction("saveTradeRules", { tradeRules: state.tradeRules });
-    localStorage.setItem(REMOTE_LEGACY_RR_MIGRATION_KEY, "true");
-    state.forceRemoteReplace = false;
+  updateSyncStatus("Đang tải dữ liệu từ Google Sheet...");
+  const snapshot = await loadRemoteSnapshot();
+  if (!snapshot) {
+    updateSyncStatus("Chưa kết nối được Google Sheet. Dữ liệu mới vẫn được giữ trên máy.");
     return;
   }
 
-  if (remoteTrades.length) {
-    const normalizedRemoteTrades =
-      localStorage.getItem(REMOTE_LEGACY_RR_MIGRATION_KEY) === "true"
-        ? normalizeTrades(remoteTrades)
-        : applyLegacyRrRule(remoteTrades);
-    const localTradesToMerge = HAD_LOCAL_TRADES ? state.trades : [];
-    state.trades = mergeRemoteTradesById(localTradesToMerge, normalizedRemoteTrades);
-    saveTrades();
-    render();
-    await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
-    await sendRemoteAction("saveMethods", { methods: state.methods });
-    await sendRemoteAction("saveTradeRules", { tradeRules: state.tradeRules });
-    localStorage.setItem(REMOTE_LEGACY_RR_MIGRATION_KEY, "true");
-    return;
-  }
+  snapshot.deletedTradeIds.forEach((id) => state.deletedTradeIds.add(id));
+  state.trades = state.trades.filter((trade) => !state.deletedTradeIds.has(trade.id));
+  const normalizedRemoteTrades =
+    localStorage.getItem(REMOTE_LEGACY_RR_MIGRATION_KEY) === "true"
+      ? normalizeTrades(snapshot.trades)
+      : applyLegacyRrRule(snapshot.trades);
+  const remoteById = new Map(normalizedRemoteTrades.map((trade) => [trade.id, trade]));
+  const localTradesToMerge = HAD_LOCAL_TRADES ? state.trades : [];
 
-  await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
+  localTradesToMerge.forEach((trade) => {
+    const remoteTrade = remoteById.get(trade.id);
+    if (!remoteTrade || tradeModifiedAt(trade) > tradeModifiedAt(remoteTrade)) queueTradeUpsert(trade);
+  });
+  state.deletedTradeIds.forEach((id) => {
+    if (!snapshot.deletedTradeIds.has(id) && remoteById.has(id)) {
+      queueSyncOperation({ type: "delete", id, updatedAt: Date.now(), queuedAt: Date.now() });
+    }
+  });
+
+  state.trades = mergeRemoteTradesById(localTradesToMerge, normalizedRemoteTrades);
+  saveDeletedTradeIds();
+  saveTrades();
+  render();
+  localStorage.setItem(REMOTE_LEGACY_RR_MIGRATION_KEY, "true");
+  await flushPendingSync();
   await sendRemoteAction("saveRrRules", { rrRules: state.rrRules });
   await sendRemoteAction("saveMethods", { methods: state.methods });
   await sendRemoteAction("saveTradeRules", { tradeRules: state.tradeRules });
-  localStorage.setItem(REMOTE_LEGACY_RR_MIGRATION_KEY, "true");
 }
 
-async function loadRemoteTrades() {
+async function loadRemoteSnapshot() {
   try {
-    const response = await fetch(REMOTE_DB_URL);
+    const response = await fetch(`${REMOTE_DB_URL}?sync=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) throw new Error("Remote request failed");
     const data = await response.json();
     applyRemoteRrRules(data);
-    return Array.isArray(data.trades) ? data.trades : [];
+    return normalizeRemoteSnapshot(data);
   } catch {
-    return loadRemoteTradesJsonp();
+    return loadRemoteSnapshotJsonp();
   }
 }
 
-function loadRemoteTradesJsonp() {
+function normalizeRemoteSnapshot(data) {
+  return {
+    trades: Array.isArray(data && data.trades) ? data.trades : [],
+    deletedTradeIds: new Set(Array.isArray(data && data.deletedTradeIds) ? data.deletedTradeIds.map(String) : []),
+  };
+}
+
+function loadRemoteSnapshotJsonp() {
   return new Promise((resolve) => {
-    const callbackName = `tradeJournalCallback_${Date.now()}`;
+    const callbackName = `tradeJournalCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const script = document.createElement("script");
     const cleanup = () => {
+      window.clearTimeout(timeout);
       delete window[callbackName];
       script.remove();
     };
-
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      resolve(null);
+    }, 12000);
     window[callbackName] = (data) => {
       cleanup();
       applyRemoteRrRules(data);
-      resolve(Array.isArray(data.trades) ? data.trades : []);
+      resolve(normalizeRemoteSnapshot(data));
     };
-
     script.addEventListener("error", () => {
       cleanup();
-      resolve([]);
+      resolve(null);
     });
-
-    script.src = `${REMOTE_DB_URL}?callback=${callbackName}`;
+    script.src = `${REMOTE_DB_URL}?callback=${callbackName}&sync=${Date.now()}`;
     document.body.appendChild(script);
   });
 }
@@ -738,18 +793,14 @@ function applyRemoteRrRules(data) {
   applyRemoteMethods(data);
   applyRemoteTradeRules(data);
   if (!data || !Array.isArray(data.rrRules)) return;
-
   state.rrRules = normalizeRrRules(data.rrRules);
   activeRrRules = state.rrRules;
   saveRrRules();
-  if (elements && elements.oneRValue) {
-    updateRrRuleInputs();
-  }
+  if (elements && elements.oneRValue) updateRrRuleInputs();
 }
 
 function applyRemoteTradeRules(data) {
   if (!data || !data.tradeRules || typeof data.tradeRules !== "object") return;
-
   const remoteRules = normalizeTradeRules(data.tradeRules);
   if (remoteRules.updatedAt >= state.tradeRules.updatedAt) {
     state.tradeRules = remoteRules;
@@ -770,14 +821,52 @@ async function sendRemoteAction(action, payload) {
     await fetch(REMOTE_DB_URL, {
       method: "POST",
       mode: "no-cors",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8",
-      },
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ action, ...payload }),
     });
+    return true;
   } catch {
-    // LocalStorage remains the offline fallback if Google Sheets is unavailable.
+    return false;
   }
+}
+
+function operationConfirmed(operation, snapshot) {
+  const remoteTrade = snapshot.trades.find((trade) => String(trade.id) === String(operation.id));
+  if (operation.type === "delete") {
+    return snapshot.deletedTradeIds.has(String(operation.id)) || !remoteTrade;
+  }
+  return Boolean(remoteTrade) && tradeModifiedAt(remoteTrade) >= Number(operation.trade.updatedAt || 0);
+}
+
+async function flushPendingSync() {
+  if (state.syncInProgress || !state.pendingSync.length) {
+    updateSyncStatus();
+    return;
+  }
+  state.syncInProgress = true;
+  updateSyncStatus();
+  const operations = [...state.pendingSync];
+  let sentAny = false;
+  for (const operation of operations) {
+    const sent = operation.type === "delete"
+      ? await sendRemoteAction("delete", { id: operation.id, updatedAt: operation.updatedAt })
+      : await sendRemoteAction("upsert", { trade: operation.trade });
+    sentAny = sentAny || sent;
+  }
+  if (sentAny) {
+    await wait(900);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const snapshot = await loadRemoteSnapshot();
+      if (snapshot) {
+        state.pendingSync = state.pendingSync.filter((operation) => !operationConfirmed(operation, snapshot));
+        savePendingSync();
+        if (!state.pendingSync.length) break;
+      }
+      await wait(900 * (attempt + 1));
+    }
+  }
+  state.syncInProgress = false;
+  updateSyncStatus();
 }
 
 function remoteSheetDate(date) {
@@ -795,8 +884,9 @@ function remoteTradePayload(trade) {
     rr: Number(trade.rr),
     note: trade.note || "",
     method: trade.method || "",
-    createdAt: tradeModifiedAt(trade) || Date.now(),
+    createdAt: Number(trade.createdAt) || Date.now(),
     updatedAt: tradeModifiedAt(trade) || Date.now(),
+    version: Number(trade.version) || 0,
   };
 }
 
@@ -840,6 +930,7 @@ function normalizeTrades(trades) {
     method: String(trade.method || "").trim(),
     createdAt: Number(trade.createdAt) || Date.now(),
     updatedAt: Number(trade.updatedAt) || Number(trade.createdAt) || Date.now(),
+    version: Number(trade.version) || 0,
   }));
 }
 
@@ -1196,7 +1287,8 @@ function importTradeData(file) {
       saveTrades();
       saveMethods();
       saveTradeRulesLocally();
-      await sendRemoteAction("replaceAll", { trades: sortedTrades(state.trades).map(remoteTradePayload) });
+      normalizeTrades(importedTrades).forEach(queueTradeUpsert);
+      await flushPendingSync();
       await sendRemoteAction("saveMethods", { methods: state.methods });
       await sendRemoteAction("saveTradeRules", { tradeRules: state.tradeRules });
       render();
@@ -1518,9 +1610,10 @@ elements.form.addEventListener("submit", async (event) => {
   state.deletedTradeIds.delete(payload.id);
   saveDeletedTradeIds();
   saveTrades();
-  await sendRemoteAction("upsert", { trade: remoteTradePayload(payload) });
+  queueTradeUpsert(payload);
   resetForm();
   render();
+  await flushPendingSync();
 });
 
 elements.resetForm.addEventListener("click", resetForm);
@@ -1608,8 +1701,9 @@ elements.tradeRows.addEventListener("click", async (event) => {
     rememberDeletedTrade(trade.id);
     state.trades = state.trades.filter((item) => item.id !== trade.id);
     saveTrades();
-    await sendRemoteAction("delete", { id: trade.id });
+    queueTradeDelete(trade);
     render();
+    await flushPendingSync();
     return;
   }
 
@@ -1631,15 +1725,20 @@ elements.tradeRows.addEventListener("click", async (event) => {
 elements.clearAll.addEventListener("click", async () => {
   const ok = confirm("Xóa tất cả lệnh đang lưu trên trình duyệt này?");
   if (!ok) return;
-  state.trades.forEach((trade) => rememberDeletedTrade(trade.id));
+  const tradesToDelete = [...state.trades];
+  tradesToDelete.forEach((trade) => {
+    rememberDeletedTrade(trade.id);
+    queueTradeDelete(trade);
+  });
   state.trades = [];
   saveTrades();
-  await sendRemoteAction("replaceAll", { trades: [] });
   resetForm();
   render();
+  await flushPendingSync();
 });
 
 window.addEventListener("resize", () => drawChart(filteredTrades()));
+window.addEventListener("online", flushPendingSync);
 
 initializeAccessGate();
 resetForm();

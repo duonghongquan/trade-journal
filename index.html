@@ -8,7 +8,7 @@
       name="description"
       content="Web riêng tư để thống kê lệnh trade, theo dõi winrate, lợi nhuận và biểu đồ tăng trưởng."
     />
-    <link rel="stylesheet" href="./styles.css?v=20260929-method-guide" />
+    <link rel="stylesheet" href="./styles.css?v=20261006-durable-sync" />
   </head>
   <body class="access-locked">
     <section class="access-gate" id="accessGate" aria-label="Mở khóa dashboard">
@@ -56,6 +56,7 @@
         <div class="form-head">
           <div>
             <h2 id="formTitle">Nhập lệnh trade</h2>
+            <p class="sync-status" id="syncStatus" role="status">Đang tải dữ liệu từ Google Sheet...</p>
           </div>
           <div class="form-actions">
             <button class="ghost-button" type="button" id="openMethodGuide">Xem quy tắc</button>
@@ -279,6 +280,6 @@
       </form>
     </dialog>
 
-    <script src="./app.js?v=20260930-editable-rules"></script>
+    <script src="./app.js?v=20261006-durable-sync"></script>
   </body>
 </html>
