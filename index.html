@@ -8,7 +8,7 @@
       name="description"
       content="Web riêng tư để thống kê lệnh trade, theo dõi winrate, lợi nhuận và biểu đồ tăng trưởng."
     />
-    <link rel="stylesheet" href="./styles.css?v=20261014-date-range" />
+    <link rel="stylesheet" href="./styles.css?v=20261014-calendar-range" />
   </head>
   <body class="access-locked">
     <section class="access-gate" id="accessGate" aria-label="Mở khóa dashboard">
@@ -148,15 +148,32 @@
                 <option value="all">Tất cả</option>
               </select>
             </label>
-            <label class="date-filter">
-              Từ ngày
-              <input id="dateFromFilter" type="date" />
-            </label>
-            <label class="date-filter">
-              Đến ngày
-              <input id="dateToFilter" type="date" />
-            </label>
-            <button class="icon-button clear-date-filter" type="button" id="clearDateFilter" title="Xóa lọc theo khoảng ngày" aria-label="Xóa lọc theo khoảng ngày">×</button>
+            <div class="date-range-control" id="dateRangeControl">
+              <span class="filter-label">Khoảng ngày</span>
+              <button class="date-range-trigger" type="button" id="dateRangeTrigger" aria-haspopup="dialog" aria-expanded="false">
+                <span id="dateRangeLabel">Chọn khoảng ngày</span>
+                <span aria-hidden="true">▾</span>
+              </button>
+              <input id="dateFromFilter" type="hidden" />
+              <input id="dateToFilter" type="hidden" />
+              <div class="date-range-popover" id="dateRangePopover" role="dialog" aria-label="Chọn khoảng ngày" hidden>
+                <div class="calendar-head">
+                  <strong id="calendarMonthLabel"></strong>
+                  <div class="calendar-nav">
+                    <button type="button" id="calendarPrevious" title="Tháng trước" aria-label="Tháng trước">‹</button>
+                    <button type="button" id="calendarNext" title="Tháng sau" aria-label="Tháng sau">›</button>
+                  </div>
+                </div>
+                <div class="calendar-weekdays" aria-hidden="true">
+                  <span>H</span><span>B</span><span>T</span><span>N</span><span>S</span><span>B</span><span>C</span>
+                </div>
+                <div class="calendar-grid" id="dateRangeGrid"></div>
+                <div class="calendar-footer">
+                  <button type="button" id="clearDateFilter">Xóa</button>
+                  <button type="button" id="calendarToday">Hôm nay</button>
+                </div>
+              </div>
+            </div>
             <label>
               Cặp
               <select id="pairFilter">
@@ -289,6 +306,6 @@
       </form>
     </dialog>
 
-    <script src="./app.js?v=20261014-date-range"></script>
+    <script src="./app.js?v=20261014-calendar-range"></script>
   </body>
 </html>

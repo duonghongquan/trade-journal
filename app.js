@@ -355,6 +355,7 @@ const state = {
   monthFilterInitialized: false,
   chartPoints: [],
   activeChartIndex: null,
+  calendarViewDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
 };
 
 if (localStorage.getItem(TRADE_RULES_CONTENT_VERSION_KEY) !== CURRENT_TRADE_RULES_CONTENT_VERSION) {
@@ -419,6 +420,15 @@ const elements = {
   growthChart: document.querySelector("#growthChart"),
   tradeRows: document.querySelector("#tradeRows"),
   monthFilter: document.querySelector("#monthFilter"),
+  dateRangeControl: document.querySelector("#dateRangeControl"),
+  dateRangeTrigger: document.querySelector("#dateRangeTrigger"),
+  dateRangeLabel: document.querySelector("#dateRangeLabel"),
+  dateRangePopover: document.querySelector("#dateRangePopover"),
+  dateRangeGrid: document.querySelector("#dateRangeGrid"),
+  calendarMonthLabel: document.querySelector("#calendarMonthLabel"),
+  calendarPrevious: document.querySelector("#calendarPrevious"),
+  calendarNext: document.querySelector("#calendarNext"),
+  calendarToday: document.querySelector("#calendarToday"),
   dateFromFilter: document.querySelector("#dateFromFilter"),
   dateToFilter: document.querySelector("#dateToFilter"),
   clearDateFilter: document.querySelector("#clearDateFilter"),
@@ -1094,6 +1104,106 @@ function formatFilterDate(date) {
   return `${day}/${month}/${year}`;
 }
 
+function dateValueFromDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateFromInputValue(value) {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function renderDateRangePicker() {
+  const dateFrom = elements.dateFromFilter.value;
+  const dateTo = elements.dateToFilter.value;
+  elements.dateRangeLabel.textContent =
+    dateFrom && dateTo
+      ? `${formatFilterDate(dateFrom)} – ${formatFilterDate(dateTo)}`
+      : dateFrom
+        ? `${formatFilterDate(dateFrom)} – Chọn ngày cuối`
+        : "Chọn khoảng ngày";
+  elements.clearDateFilter.disabled = !dateFrom && !dateTo;
+
+  const viewDate = state.calendarViewDate;
+  elements.calendarMonthLabel.textContent = viewDate.toLocaleDateString("vi-VN", {
+    month: "long",
+    year: "numeric",
+  });
+  elements.dateRangeGrid.innerHTML = "";
+
+  const firstDay = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+  const mondayOffset = (firstDay.getDay() + 6) % 7;
+  const today = dateValueFromDate(new Date());
+
+  for (let index = 0; index < 42; index += 1) {
+    const date = new Date(viewDate.getFullYear(), viewDate.getMonth(), index - mondayOffset + 1);
+    const value = dateValueFromDate(date);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "calendar-day";
+    button.dataset.date = value;
+    button.textContent = date.getDate();
+    button.title = formatFilterDate(value);
+    button.setAttribute("aria-label", formatFilterDate(value));
+    button.classList.toggle("outside-month", date.getMonth() !== viewDate.getMonth());
+    button.classList.toggle("today", value === today);
+    button.classList.toggle("range-start", value === dateFrom);
+    button.classList.toggle("range-end", value === dateTo);
+    button.classList.toggle("in-range", Boolean(dateFrom && dateTo && value > dateFrom && value < dateTo));
+    elements.dateRangeGrid.appendChild(button);
+  }
+}
+
+function setDateRangePopoverOpen(open) {
+  if (open) {
+    const selectedDate = dateFromInputValue(elements.dateFromFilter.value) || new Date();
+    state.calendarViewDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+  }
+
+  elements.dateRangePopover.classList.remove("open-upward", "align-right");
+  elements.dateRangePopover.hidden = !open;
+  elements.dateRangeTrigger.setAttribute("aria-expanded", String(open));
+  renderDateRangePicker();
+
+  if (open) {
+    const triggerRect = elements.dateRangeTrigger.getBoundingClientRect();
+    const popoverHeight = elements.dateRangePopover.offsetHeight;
+    const shouldOpenUpward =
+      window.innerHeight - triggerRect.bottom < popoverHeight + 12 &&
+      triggerRect.top > popoverHeight + 12;
+    elements.dateRangePopover.classList.toggle("open-upward", shouldOpenUpward);
+    const popoverRect = elements.dateRangePopover.getBoundingClientRect();
+    elements.dateRangePopover.classList.toggle("align-right", popoverRect.right > window.innerWidth - 12);
+  }
+}
+
+function selectDateRangeDate(value) {
+  const currentFrom = elements.dateFromFilter.value;
+  const currentTo = elements.dateToFilter.value;
+
+  if (!currentFrom || currentTo) {
+    elements.dateFromFilter.value = value;
+    elements.dateToFilter.value = "";
+  } else if (value < currentFrom) {
+    elements.dateFromFilter.value = value;
+    elements.dateToFilter.value = currentFrom;
+  } else {
+    elements.dateToFilter.value = value;
+  }
+
+  elements.monthFilter.value = "all";
+  const rangeComplete = Boolean(elements.dateToFilter.value);
+  render();
+  if (rangeComplete) {
+    elements.dateRangePopover.hidden = true;
+    elements.dateRangeTrigger.setAttribute("aria-expanded", "false");
+  }
+}
+
 function calculateStats(trades) {
   const wins = trades.filter((trade) => trade.result === "WIN");
   const losses = trades.filter((trade) => trade.result === "LOSS");
@@ -1602,7 +1712,7 @@ function render() {
       : elements.noteFilter.value === "without"
         ? "không ghi chú"
         : "tất cả ghi chú";
-  elements.clearDateFilter.disabled = !dateFrom && !dateTo;
+  renderDateRangePicker();
   elements.filterSummary.textContent = `Đang hiển thị ${trades.length} lệnh: ${timeText}, ${pairText}, ${methodText}, ${noteText}.`;
 }
 
@@ -1679,25 +1789,48 @@ elements.monthFilter.addEventListener("change", () => {
   if (elements.monthFilter.value !== "all") {
     elements.dateFromFilter.value = "";
     elements.dateToFilter.value = "";
-    elements.dateFromFilter.max = "";
-    elements.dateToFilter.min = "";
   }
+  elements.dateRangePopover.hidden = true;
+  elements.dateRangeTrigger.setAttribute("aria-expanded", "false");
   render();
 });
-const handleDateRangeChange = () => {
-  elements.monthFilter.value = "all";
-  elements.dateFromFilter.max = elements.dateToFilter.value;
-  elements.dateToFilter.min = elements.dateFromFilter.value;
-  render();
-};
-elements.dateFromFilter.addEventListener("change", handleDateRangeChange);
-elements.dateToFilter.addEventListener("change", handleDateRangeChange);
+elements.dateRangeTrigger.addEventListener("click", () => {
+  setDateRangePopoverOpen(elements.dateRangePopover.hidden);
+});
+elements.calendarPrevious.addEventListener("click", () => {
+  state.calendarViewDate = new Date(state.calendarViewDate.getFullYear(), state.calendarViewDate.getMonth() - 1, 1);
+  renderDateRangePicker();
+});
+elements.calendarNext.addEventListener("click", () => {
+  state.calendarViewDate = new Date(state.calendarViewDate.getFullYear(), state.calendarViewDate.getMonth() + 1, 1);
+  renderDateRangePicker();
+});
+elements.calendarToday.addEventListener("click", () => {
+  const today = new Date();
+  state.calendarViewDate = new Date(today.getFullYear(), today.getMonth(), 1);
+  renderDateRangePicker();
+});
+elements.dateRangeGrid.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-date]");
+  if (button) selectDateRangeDate(button.dataset.date);
+});
 elements.clearDateFilter.addEventListener("click", () => {
   elements.dateFromFilter.value = "";
   elements.dateToFilter.value = "";
-  elements.dateFromFilter.max = "";
-  elements.dateToFilter.min = "";
+  elements.dateRangePopover.hidden = true;
+  elements.dateRangeTrigger.setAttribute("aria-expanded", "false");
   render();
+});
+document.addEventListener("click", (event) => {
+  if (!elements.dateRangePopover.hidden && !event.composedPath().includes(elements.dateRangeControl)) {
+    setDateRangePopoverOpen(false);
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !elements.dateRangePopover.hidden) {
+    setDateRangePopoverOpen(false);
+    elements.dateRangeTrigger.focus();
+  }
 });
 elements.pairFilter.addEventListener("change", render);
 elements.noteFilter.addEventListener("change", render);
