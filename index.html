@@ -8,7 +8,7 @@
       name="description"
       content="Web riêng tư để thống kê lệnh trade, theo dõi winrate, lợi nhuận và biểu đồ tăng trưởng."
     />
-    <link rel="stylesheet" href="./styles.css?v=20261006-durable-sync" />
+    <link rel="stylesheet" href="./styles.css?v=20261014-date-range" />
   </head>
   <body class="access-locked">
     <section class="access-gate" id="accessGate" aria-label="Mở khóa dashboard">
@@ -148,6 +148,15 @@
                 <option value="all">Tất cả</option>
               </select>
             </label>
+            <label class="date-filter">
+              Từ ngày
+              <input id="dateFromFilter" type="date" />
+            </label>
+            <label class="date-filter">
+              Đến ngày
+              <input id="dateToFilter" type="date" />
+            </label>
+            <button class="icon-button clear-date-filter" type="button" id="clearDateFilter" title="Xóa lọc theo khoảng ngày" aria-label="Xóa lọc theo khoảng ngày">×</button>
             <label>
               Cặp
               <select id="pairFilter">
@@ -280,6 +289,6 @@
       </form>
     </dialog>
 
-    <script src="./app.js?v=20261014-rules-v2"></script>
+    <script src="./app.js?v=20261014-date-range"></script>
   </body>
 </html>

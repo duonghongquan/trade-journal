@@ -419,6 +419,9 @@ const elements = {
   growthChart: document.querySelector("#growthChart"),
   tradeRows: document.querySelector("#tradeRows"),
   monthFilter: document.querySelector("#monthFilter"),
+  dateFromFilter: document.querySelector("#dateFromFilter"),
+  dateToFilter: document.querySelector("#dateToFilter"),
+  clearDateFilter: document.querySelector("#clearDateFilter"),
   pairFilter: document.querySelector("#pairFilter"),
   noteFilter: document.querySelector("#noteFilter"),
   methodFilter: document.querySelector("#methodFilter"),
@@ -1066,9 +1069,14 @@ function filteredTrades() {
   const selectedPair = elements.pairFilter.value;
   const selectedNote = elements.noteFilter.value;
   const selectedMethod = elements.methodFilter.value;
+  const dateFrom = elements.dateFromFilter.value;
+  const dateTo = elements.dateToFilter.value;
 
   return sortedTrades().filter((trade) => {
-    const monthMatch = selectedMonth === "all" || monthKey(trade.date) === selectedMonth;
+    const tradeDate = normalizeDateValue(trade.date);
+    const monthMatch = selectedMonth === "all" || monthKey(tradeDate) === selectedMonth;
+    const dateFromMatch = !dateFrom || tradeDate >= dateFrom;
+    const dateToMatch = !dateTo || tradeDate <= dateTo;
     const pairMatch = selectedPair === "all" || trade.pair === selectedPair;
     const hasNote = Boolean((trade.note || "").trim());
     const noteMatch =
@@ -1076,8 +1084,14 @@ function filteredTrades() {
       (selectedNote === "with" && hasNote) ||
       (selectedNote === "without" && !hasNote);
     const methodMatch = selectedMethod === "all" || (trade.method || "") === selectedMethod;
-    return monthMatch && pairMatch && noteMatch && methodMatch;
+    return monthMatch && dateFromMatch && dateToMatch && pairMatch && noteMatch && methodMatch;
   });
+}
+
+function formatFilterDate(date) {
+  if (!date) return "";
+  const [year, month, day] = date.split("-");
+  return `${day}/${month}/${year}`;
 }
 
 function calculateStats(trades) {
@@ -1569,6 +1583,17 @@ function render() {
   drawChart(trades);
 
   const monthText = elements.monthFilter.value === "all" ? "tất cả tháng" : `tháng ${elements.monthFilter.value}`;
+  const dateFrom = elements.dateFromFilter.value;
+  const dateTo = elements.dateToFilter.value;
+  const dateRangeText =
+    dateFrom && dateTo
+      ? `từ ${formatFilterDate(dateFrom)} đến ${formatFilterDate(dateTo)}`
+      : dateFrom
+        ? `từ ${formatFilterDate(dateFrom)}`
+        : dateTo
+          ? `đến ${formatFilterDate(dateTo)}`
+          : "";
+  const timeText = dateRangeText || monthText;
   const pairText = elements.pairFilter.value === "all" ? "tất cả cặp" : elements.pairFilter.value;
   const methodText = elements.methodFilter.value === "all" ? "tất cả phương pháp" : elements.methodFilter.value;
   const noteText =
@@ -1577,7 +1602,8 @@ function render() {
       : elements.noteFilter.value === "without"
         ? "không ghi chú"
         : "tất cả ghi chú";
-  elements.filterSummary.textContent = `Đang hiển thị ${trades.length} lệnh: ${monthText}, ${pairText}, ${methodText}, ${noteText}.`;
+  elements.clearDateFilter.disabled = !dateFrom && !dateTo;
+  elements.filterSummary.textContent = `Đang hiển thị ${trades.length} lệnh: ${timeText}, ${pairText}, ${methodText}, ${noteText}.`;
 }
 
 elements.accessForm.addEventListener("submit", (event) => {
@@ -1649,7 +1675,30 @@ elements.newMethod.addEventListener("keydown", (event) => {
   event.preventDefault();
   addMethod();
 });
-elements.monthFilter.addEventListener("change", render);
+elements.monthFilter.addEventListener("change", () => {
+  if (elements.monthFilter.value !== "all") {
+    elements.dateFromFilter.value = "";
+    elements.dateToFilter.value = "";
+    elements.dateFromFilter.max = "";
+    elements.dateToFilter.min = "";
+  }
+  render();
+});
+const handleDateRangeChange = () => {
+  elements.monthFilter.value = "all";
+  elements.dateFromFilter.max = elements.dateToFilter.value;
+  elements.dateToFilter.min = elements.dateFromFilter.value;
+  render();
+};
+elements.dateFromFilter.addEventListener("change", handleDateRangeChange);
+elements.dateToFilter.addEventListener("change", handleDateRangeChange);
+elements.clearDateFilter.addEventListener("click", () => {
+  elements.dateFromFilter.value = "";
+  elements.dateToFilter.value = "";
+  elements.dateFromFilter.max = "";
+  elements.dateToFilter.min = "";
+  render();
+});
 elements.pairFilter.addEventListener("change", render);
 elements.noteFilter.addEventListener("change", render);
 elements.methodFilter.addEventListener("change", render);

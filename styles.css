@@ -564,6 +564,23 @@ canvas {
   width: 150px;
 }
 
+.filters .date-filter {
+  width: 148px;
+}
+
+.clear-date-filter {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.clear-date-filter:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .table-wrap {
   margin-top: 10px;
   overflow-x: auto;
