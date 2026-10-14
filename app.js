@@ -2,6 +2,8 @@ const STORAGE_KEY = "private-trade-journal-v1";
 const RR_RULES_KEY = "private-trade-journal-rr-rules-v1";
 const METHODS_KEY = "private-trade-journal-methods-v1";
 const TRADE_RULES_KEY = "private-trade-journal-trade-rules-v1";
+const TRADE_RULES_CONTENT_VERSION_KEY = "private-trade-journal-trade-rules-content-version-v1";
+const CURRENT_TRADE_RULES_CONTENT_VERSION = "20261014-v2";
 const DATASET_VERSION_KEY = "private-trade-journal-dataset-version-v1";
 const CURRENT_DATASET_VERSION = "20260902-sheet-images-v2";
 const DELETED_TRADE_IDS_KEY = "private-trade-journal-deleted-ids-v1";
@@ -25,14 +27,18 @@ const DEFAULT_TRADE_RULES = {
   reversal: [
     "Tạo 2 đỉnh, 2 đáy ở khung M15.",
     "Các khung lớn hơn: giá cách xa EMA, RSI phân kỳ.",
-    "Tạo cấu trúc Dow ở khung vào lệnh.",
+    "Tạo Dow ở khung M5.",
   ],
   trend: [
     "Xác định biên khung M15.",
-    "Chờ phá biên, đồng thời tạo cấu trúc Dow ở khung M5.",
+    "Chờ phá biên, đồng thời tạo Dow ở khung M5.",
   ],
   trendPriority: "Ưu tiên thuận xu hướng.",
-  range: ["Giao dịch trong biên cản đã chạm 2 lần và bật ra."],
+  range: [
+    "Giao dịch trong biên, cản chạm 2 lần biên M15 bật ra.",
+    "Chỉ giao dịch theo chiều bật ra của khung M15.",
+    "Khung M5 tạo Dow.",
+  ],
   updatedAt: 0,
 };
 let activeRrRules = loadRrRules();
@@ -350,6 +356,12 @@ const state = {
   chartPoints: [],
   activeChartIndex: null,
 };
+
+if (localStorage.getItem(TRADE_RULES_CONTENT_VERSION_KEY) !== CURRENT_TRADE_RULES_CONTENT_VERSION) {
+  state.tradeRules = normalizeTradeRules({ ...DEFAULT_TRADE_RULES, updatedAt: Date.now() });
+  saveTradeRulesLocally();
+  localStorage.setItem(TRADE_RULES_CONTENT_VERSION_KEY, CURRENT_TRADE_RULES_CONTENT_VERSION);
+}
 
 if (localStorage.getItem(LOCAL_LEGACY_RR_MIGRATION_KEY) !== "true") {
   state.trades = applyLegacyRrRule(state.trades);
